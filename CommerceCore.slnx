@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/CommerceCore.Application/CommerceCore.Application.csproj" />
+    <Project Path="src/Core/CommerceCore.Domain/CommerceCore.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/CommerceCore.Infrastructure/CommerceCore.Infrastructure.csproj" />
+    <Project Path="src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj" />
+  </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj" />
+  </Folder>
+</Solution>

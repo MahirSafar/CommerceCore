@@ -1,0 +1,77 @@
+# ==========================================
+# 1. Appsettings & Configuration (SECRETS)
+# ==========================================
+**/appsettings.json
+**/appsettings.*.json
+
+!**/appsettings.Development.json
+
+
+# ==========================================
+# 2. Build Outputs & Binaries (.NET 10)
+# ==========================================
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+
+# ==========================================
+# 3. Visual Studio & Visual Studio Insider
+# ==========================================
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userlibraries
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.log
+
+
+# ==========================================
+# 4. Visual Studio Code & Rider IDE
+# ==========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.ReSharper*
+
+
+# ==========================================
+# 5. NuGet Packages & Local Cache
+# ==========================================
+*.nupkg
+**/packages/
+project.lock.json
+project.fragment.lock.json
+
+
+# ==========================================
+# 6. OS Generated Files
+# ==========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
