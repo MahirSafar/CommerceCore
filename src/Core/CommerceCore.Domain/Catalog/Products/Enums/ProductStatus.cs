@@ -1,4 +1,4 @@
-﻿namespace CommerceCore.Domain.Catalog.Products;
+﻿namespace CommerceCore.Domain.Catalog.Products.Enums;
 
 public enum ProductStatus
 {
