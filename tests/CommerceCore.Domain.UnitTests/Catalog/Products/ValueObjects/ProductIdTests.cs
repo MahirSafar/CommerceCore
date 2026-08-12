@@ -1,9 +1,7 @@
-using System;
-using CommerceCore.Domain.Catalog.Products;
+﻿using System;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
-using Xunit;
 
-namespace CommerceCore.Domain.Tests.Catalog.Products;
+namespace CommerceCore.Domain.UnitTests.Catalog.Products.ValueObjects;
 
 public class ProductIdTests
 {
@@ -15,5 +13,11 @@ public class ProductIdTests
 
         Assert.NotEqual(Guid.Empty, productId.Value);
         Assert.Equal('7', idString[14]);
+    }
+
+    [Fact]
+    public void From_EmptyGuid_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() => ProductId.From(Guid.Empty));
     }
 }

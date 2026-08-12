@@ -1,5 +1,4 @@
-﻿using CommerceCore.Domain.Common.Localization;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 
 namespace CommerceCore.Domain.Common.ValueObjects.Localization;
 

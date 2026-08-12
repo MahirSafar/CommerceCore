@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace CommerceCore.Domain.Common.Localization;
+namespace CommerceCore.Domain.Common.ValueObjects.Localization;
 
 public readonly partial record struct LanguageCode
 {

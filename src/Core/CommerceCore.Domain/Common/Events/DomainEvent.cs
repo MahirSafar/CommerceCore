@@ -3,7 +3,7 @@
 public abstract record DomainEvent : IDomainEvent
 {
     protected DomainEvent(DateTimeOffset occurredOnUtc)
-      : this(Guid.NewGuid(), occurredOnUtc)
+      : this(Guid.CreateVersion7(), occurredOnUtc)
     {
     }
 

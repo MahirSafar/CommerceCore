@@ -1,8 +1,6 @@
-using System;
-using CommerceCore.Domain.Common.ValueObjects;
-using Xunit;
+﻿using CommerceCore.Domain.Common.ValueObjects;
 
-namespace CommerceCore.Domain.Tests.Common;
+namespace CommerceCore.Domain.UnitTests.Common.ValueObjects;
 
 public class MoneyTests
 {

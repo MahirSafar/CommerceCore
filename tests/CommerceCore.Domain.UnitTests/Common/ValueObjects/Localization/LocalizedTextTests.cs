@@ -1,10 +1,6 @@
-using System;
-using CommerceCore.Domain.Common.Localization;
-using CommerceCore.Domain.Common.ValueObjects.Localization;
-using System.Collections.Generic;
-using Xunit;
+﻿using CommerceCore.Domain.Common.ValueObjects.Localization;
 
-namespace CommerceCore.Domain.Tests.Common.Localization;
+namespace CommerceCore.Domain.UnitTests.Common.ValueObjects.Localization;
 
 public class LocalizedTextTests
 {
@@ -42,8 +38,8 @@ public class LocalizedTextTests
         var lang = LanguageCode.Create("en");
         var translations = new List<KeyValuePair<LanguageCode, string>>
         {
-            new KeyValuePair<LanguageCode, string>(lang, "A"),
-            new KeyValuePair<LanguageCode, string>(lang, "B"),
+            new(lang, "A"),
+            new(lang, "B"),
         };
 
         var ex = Assert.Throws<ArgumentException>(() => LocalizedText.Create(lang, translations));
@@ -58,5 +54,22 @@ public class LocalizedTextTests
 
         var ex = Assert.Throws<ArgumentException>(() => LocalizedText.Create(lang, translations));
         Assert.Contains("At least one translation is required", ex.Message);
+    }
+
+    [Fact]
+    public void GetOrDefault_ReturnsDefaultLanguage_WhenRequestedMissing()
+    {
+        var defaultLang = LanguageCode.Create("en");
+        var otherLang = LanguageCode.Create("az");
+        var translations = new Dictionary<LanguageCode, string>
+        {
+            { defaultLang, "Notebook" }
+        };
+
+        var localized = LocalizedText.Create(defaultLang, translations);
+
+        var result = localized.GetOrDefault(otherLang);
+
+        Assert.Equal("Notebook", result);
     }
 }

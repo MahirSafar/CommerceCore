@@ -1,8 +1,6 @@
-using System;
-using CommerceCore.Domain.Common.Localization;
-using Xunit;
+﻿using CommerceCore.Domain.Common.ValueObjects.Localization;
 
-namespace CommerceCore.Domain.Tests.Catalog.Products;
+namespace CommerceCore.Domain.UnitTests.Common.ValueObjects.Localization;
 
 public class LanguageCodeTests
 {
@@ -16,7 +14,7 @@ public class LanguageCodeTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("invalid@")] 
+    [InlineData("invalid@")]
     [InlineData("abc-$$$$")]
     public void Create_InvalidFormats_ShouldThrowArgumentException(string input)
     {
