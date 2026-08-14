@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CommerceCore.Application\CommerceCore.Application.csproj" />
+    <ProjectReference Include="..\..\Core\CommerceCore.Domain\CommerceCore.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

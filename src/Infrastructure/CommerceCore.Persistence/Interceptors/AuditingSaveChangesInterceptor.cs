@@ -15,10 +15,13 @@ public sealed class AuditingSaveChangesInterceptor(IClock clock, ICurrentUser cu
         if (context is null)
             return;
 
-        DateTimeOffset nowUtc = _clock.UtcNow.ToUniversalTime();
-        string? userId = _currentUser.UserId;
+        var nowUtc = _clock.UtcNow.ToUniversalTime();
+        var userId = _currentUser.UserId;
 
-        foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.Entity is IAuditableEntity && entry.State is EntityState.Added or EntityState.Modified))
+        foreach (var entry in context.ChangeTracker.Entries()
+                     .Where(entry =>
+                         entry.Entity is IAuditableEntity &&
+                         entry.State is EntityState.Added or EntityState.Modified))
         {
             if (entry.State == EntityState.Added)
             {
@@ -27,6 +30,8 @@ public sealed class AuditingSaveChangesInterceptor(IClock clock, ICurrentUser cu
 
                 entry.Property(nameof(IAuditableEntity.CreatedBy))
                     .CurrentValue = userId;
+
+                continue;
             }
 
             entry.Property(nameof(IAuditableEntity.UpdatedAtUtc))

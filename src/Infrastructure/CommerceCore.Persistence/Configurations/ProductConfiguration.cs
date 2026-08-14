@@ -26,9 +26,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
     public void Configure(EntityTypeBuilder<Product> builder)
     {
-        builder.ToTable("products", "catalog");
+        builder.ToTable("products", schema: "catalog");
 
         builder.HasKey(product => product.Id);
+
+        builder.HasQueryFilter(product => !product.IsDeleted);
 
         builder.Property(product => product.Id)
             .HasColumnName("id")
@@ -42,19 +44,6 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasConversion<string>()
             .HasMaxLength(16)
             .IsRequired();
-
-        builder.ComplexProperty(product => product.Price, price =>
-        {
-            price.Property(money => money.Amount)
-                .HasColumnName("price_amount")
-                .HasPrecision(18, 4)
-                .IsRequired();
-
-            price.Property(money => money.Currency)
-                .HasColumnName("price_currency")
-                .HasMaxLength(3)
-                .IsRequired();
-        });
 
         builder.Property(product => product.Name)
             .HasColumnName("name")
@@ -103,10 +92,26 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             product.IsDeleted
         });
 
-        builder.HasIndex(product => new
+        builder.OwnsOne(product => product.Price, price =>
         {
-            product.Price.Currency,
-            product.Price.Amount
+            price.Property(money => money.Amount)
+                .HasColumnName("price_amount")
+                .HasPrecision(18, 4)
+                .IsRequired();
+
+            price.Property(money => money.Currency)
+                .HasColumnName("price_currency")
+                .HasMaxLength(3)
+                .IsRequired();
+
+            price.HasIndex(money => new
+            {
+                money.Currency,
+                money.Amount
+            }).HasDatabaseName("ix_products_price_currency_amount");
         });
+
+        builder.Navigation(product => product.Price).IsRequired();
+
     }
 }
