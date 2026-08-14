@@ -1,9 +1,17 @@
+using CommerceCore.Api.Identity;
+using CommerceCore.Application.Common.Abstractions;
+using CommerceCore.Infrastructure.Common.Time;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+var connectionString = builder.Configuration.GetConnectionString(
+    "CommerceCoreDatabase") ?? throw new InvalidOperationException("Connection string 'CommerceCoreDatabase' was not found");
+
 builder.Services.AddOpenApi();
 
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddSingleton<IClock, SystemClock>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
