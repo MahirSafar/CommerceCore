@@ -1,11 +1,15 @@
 ﻿using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Domain.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace CommerceCore.Persistence.Interceptors;
 
-public sealed class AuditingSaveChangesInterceptor(IClock clock, ICurrentUser currentUser) : SaveChangesInterceptor
+public sealed class AuditingSaveChangesInterceptor(
+    IClock clock,
+    ICurrentUser currentUser)
+    : SaveChangesInterceptor
 {
     private readonly IClock _clock = clock;
     private readonly ICurrentUser _currentUser = currentUser;
@@ -15,13 +19,15 @@ public sealed class AuditingSaveChangesInterceptor(IClock clock, ICurrentUser cu
         if (context is null)
             return;
 
-        var nowUtc = _clock.UtcNow.ToUniversalTime();
-        var userId = _currentUser.UserId;
+        context.ChangeTracker.DetectChanges();
+
+        DateTimeOffset nowUtc = _clock.UtcNow.ToUniversalTime();
+        string? userId = _currentUser.UserId;
 
         foreach (var entry in context.ChangeTracker.Entries()
                      .Where(entry =>
                          entry.Entity is IAuditableEntity &&
-                         entry.State is EntityState.Added or EntityState.Modified))
+                         RequiresAuditUpdate(entry)))
         {
             if (entry.State == EntityState.Added)
             {
@@ -41,16 +47,33 @@ public sealed class AuditingSaveChangesInterceptor(IClock clock, ICurrentUser cu
                 .CurrentValue = userId;
         }
     }
-    public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+
+    private static bool RequiresAuditUpdate(EntityEntry entry)
+    {
+        if (entry.State is EntityState.Added or EntityState.Modified)
+            return true;
+
+        return entry.References.Any(reference =>
+            reference.TargetEntry is { } targetEntry &&
+            targetEntry.Metadata.IsOwned() &&
+            targetEntry.State is EntityState.Added
+                or EntityState.Modified
+                or EntityState.Deleted);
+    }
+
+    public override InterceptionResult<int> SavingChanges(
+        DbContextEventData eventData,
+        InterceptionResult<int> result)
     {
         ApplyAuditValues(eventData.Context);
+
         return base.SavingChanges(eventData, result);
     }
 
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
-    DbContextEventData eventData,
-    InterceptionResult<int> result,
-    CancellationToken cancellationToken = default)
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
     {
         ApplyAuditValues(eventData.Context);
 
