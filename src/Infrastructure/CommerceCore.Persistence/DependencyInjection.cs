@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.Interceptors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +12,7 @@ public static class DependencyInjection
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.AddScoped<AuditingSaveChangesInterceptor>();
+        services.AddScoped<OutboxSaveChangesInterceptor>();
 
         services.AddDbContext<CommerceCoreDbContext>(
             (serviceProvider, options) =>
@@ -26,8 +27,15 @@ public static class DependencyInjection
                             errorCodesToAdd: null);
                     });
 
+                AuditingSaveChangesInterceptor auditingInterceptor =
+                    serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>();
+
+                OutboxSaveChangesInterceptor outboxInterceptor =
+                    serviceProvider.GetRequiredService<OutboxSaveChangesInterceptor>();
+
                 options.AddInterceptors(
-                    serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>());
+                    auditingInterceptor,
+                    outboxInterceptor);
             });
 
         services.AddScoped<ICommerceCoreDbContext>(serviceProvider => serviceProvider.GetRequiredService<CommerceCoreDbContext>());
