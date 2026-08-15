@@ -22,7 +22,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     }
     private static readonly ValueConverter<LocalizedText, string> LocalizedTextConverter = new(localizedText => SerializeLocalizedText(localizedText), json => DeserializeLocalizedText(json));
 
-    private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left,right) => ReferenceEquals(left, right) || left.Equals(right), value => value.GetHashCode(), value => value);
+    private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left,right) => ReferenceEquals(left, right) || left!.Equals(right), value => value.GetHashCode(), value => value);
 
     public void Configure(EntityTypeBuilder<Product> builder)
     {
