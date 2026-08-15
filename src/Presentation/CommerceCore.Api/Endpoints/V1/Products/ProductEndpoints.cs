@@ -1,4 +1,5 @@
 ﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
@@ -66,7 +67,7 @@ public static class ProductEndpoints
                     cancellationToken);
 
                 if (result is null)
-                    return Results.NotFound();
+                    return ProductNotFound();
 
                 return Results.Ok(
                     new GetProductResponse(
@@ -95,12 +96,7 @@ public static class ProductEndpoints
                     cancellationToken);
 
                 if (result is null)
-                {
-                    return Results.Problem(
-                        statusCode: StatusCodes.Status404NotFound,
-                        type: "/problems/product-not-found",
-                        title: "Product was not found.");
-                }
+                    return ProductNotFound();
 
                 return Results.Ok(
                     new ActivateProductResponse(
@@ -127,12 +123,7 @@ public static class ProductEndpoints
                     cancellationToken);
 
                 if (result is null)
-                {
-                    return Results.Problem(
-                        statusCode: StatusCodes.Status404NotFound,
-                        type: "/problems/product-not-found",
-                        title: "Product was not found.");
-                }
+                    return ProductNotFound();
 
                 return Results.Ok(
                     new DeactivateProductResponse(
@@ -146,10 +137,37 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapPost(
+            "{productId:guid}/archive",
+            async (
+                Guid productId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                ArchiveProductResult? result = await mediator.Send(
+                    new ArchiveProductCommand(productId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductNotFound();
+
+                return Results.Ok(
+                    new ArchiveProductResponse(
+                        result.ProductId,
+                        result.ArchivedAtUtc));
+            })
+        .WithName("ArchiveProduct")
+        .Produces<ArchiveProductResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
         return endpoints;
     }
     public sealed record ActivateProductResponse(Guid ProductId, string Status);
     public sealed record DeactivateProductResponse(Guid ProductId, string Status);
+    public sealed record ArchiveProductResponse(Guid ProductId, DateTimeOffset ArchivedAtUtc);
     public sealed record GetProductResponse(
         Guid ProductId,
         string DefaultLanguage,
@@ -157,4 +175,9 @@ public static class ProductEndpoints
         decimal PriceAmount,
         string Currency,
         string Status);
+
+    private static IResult ProductNotFound() => Results.Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            type: "/problems/product-not-found",
+            title: "Product was not found.");
 }
