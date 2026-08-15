@@ -2,6 +2,7 @@
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using Mediator;
 using static CommerceCore.Api.Endpoints.V1.Products.ProductEndpoints;
@@ -163,11 +164,41 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+
+        group.MapPost(
+            "{productId:guid}/restore",
+            async (
+                Guid productId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await mediator.Send(
+                    new RestoreProductCommand(productId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductNotFound();
+
+                return Results.Ok(
+                    new RestoreProductResponse(
+                        result.ProductId,
+                        result.Status,
+                        result.Restored));
+            })
+        .WithName("RestoreProduct")
+        .Produces<RestoreProductResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
         return endpoints;
     }
     public sealed record ActivateProductResponse(Guid ProductId, string Status);
     public sealed record DeactivateProductResponse(Guid ProductId, string Status);
     public sealed record ArchiveProductResponse(Guid ProductId, DateTimeOffset ArchivedAtUtc);
+    public sealed record RestoreProductResponse(Guid ProductId, string Status, bool Restored);
     public sealed record GetProductResponse(
         Guid ProductId,
         string DefaultLanguage,
