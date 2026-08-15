@@ -1,4 +1,5 @@
 ﻿using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
+using CommerceCore.Application.Catalog.Products.Queries;
 using Mediator;
 
 namespace CommerceCore.Api.Endpoints.Products;
@@ -35,8 +36,9 @@ public static class ProductEndpoints
                     command,
                     cancellationToken);
 
-                return Results.Created(
-                    $"/api/products/{result.ProductId}",
+                return Results.CreatedAtRoute(
+                    "GetProductById",
+                    new { productId = result.ProductId },
                     new CreateProductResponse(result.ProductId));
             })
         .WithName("CreateProduct")
@@ -49,6 +51,42 @@ public static class ProductEndpoints
         .ProducesProblem(
             StatusCodes.Status500InternalServerError);
 
+        group.MapGet(
+            "{productId:guid}",
+            async (
+                Guid productId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await mediator.Send(
+                    new GetProductByIdQuery(productId),
+                    cancellationToken);
+
+                if (result is null)
+                    return Results.NotFound();
+
+                return Results.Ok(
+                    new GetProductResponse(
+                        result.ProductId,
+                        result.DefaultLanguage,
+                        result.NameTranslations,
+                        result.PriceAmount,
+                        result.Currency,
+                        result.Status));
+            })
+        .WithName("GetProductById")
+        .Produces<GetProductResponse>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status404NotFound)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
         return endpoints;
     }
+
+    public sealed record GetProductResponse(
+    Guid ProductId,
+    string DefaultLanguage,
+    IReadOnlyDictionary<string, string> NameTranslations,
+    decimal PriceAmount,
+    string Currency,
+    string Status);
 }

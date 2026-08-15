@@ -12,6 +12,8 @@
     <Project Path="src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CommerceCore.ArchitectureTests/CommerceCore.ArchitectureTests.csproj" />
     <Project Path="tests/CommerceCore.Domain.UnitTests/CommerceCore.Domain.UnitTests.csproj" />
+    <Project Path="tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj" />
   </Folder>
 </Solution>
