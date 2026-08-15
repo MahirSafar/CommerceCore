@@ -2,7 +2,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 
 namespace CommerceCore.Api.Common.Errors;
 
@@ -12,10 +11,11 @@ public sealed class GlobalExceptionHandler(
 {
     private readonly ILogger<GlobalExceptionHandler> _logger = logger;
 
-    private static Task WriteProblemAsync(
+    private static Task WriteProblemAsync<TProblemDetails>(
         HttpContext httpContext,
-        ProblemDetails problem,
+        TProblemDetails problem,
         CancellationToken cancellationToken)
+        where TProblemDetails : ProblemDetails
     {
         httpContext.Response.StatusCode = problem.Status
             ?? StatusCodes.Status500InternalServerError;
