@@ -1,4 +1,5 @@
-﻿using CommerceCore.Domain.Catalog.Products;
+﻿using CommerceCore.Application.Common.Validation;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using FluentValidation;
@@ -93,5 +94,11 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
 
         RuleFor(command => command)
             .Custom(ValidateTranslations);
+
+        RuleFor(command => command.PriceAmount)
+            .HasValidMoneyAmount();
+
+        RuleFor(command => command.Currency)
+            .HasValidCurrency();
     }
 }

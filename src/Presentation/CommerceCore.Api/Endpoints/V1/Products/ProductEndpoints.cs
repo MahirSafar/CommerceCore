@@ -1,5 +1,6 @@
 ﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
@@ -193,12 +194,47 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
+        group.MapPut(
+            "{productId:guid}/price",
+            async (
+                Guid productId,
+                ChangeProductPriceRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await mediator.Send(
+                    new ChangeProductPriceCommand(
+                        productId,
+                        request.PriceAmount,
+                        request.Currency ?? string.Empty),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductNotFound();
+
+                return Results.Ok(
+                    new ProductPriceResponse(
+                        result.ProductId,
+                        result.PriceAmount,
+                        result.Currency,
+                        result.Status));
+            })
+        .WithName("ChangeProductPrice")
+        .Produces<ProductPriceResponse>(StatusCodes.Status200OK)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
         return endpoints;
     }
     public sealed record ActivateProductResponse(Guid ProductId, string Status);
     public sealed record DeactivateProductResponse(Guid ProductId, string Status);
     public sealed record ArchiveProductResponse(Guid ProductId, DateTimeOffset ArchivedAtUtc);
     public sealed record RestoreProductResponse(Guid ProductId, string Status, bool Restored);
+    public sealed record ChangeProductPriceRequest(decimal PriceAmount, string? Currency);
+    public sealed record ProductPriceResponse(Guid ProductId, decimal PriceAmount, string Currency, string Status);
     public sealed record GetProductResponse(
         Guid ProductId,
         string DefaultLanguage,
