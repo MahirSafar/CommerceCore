@@ -26,7 +26,7 @@ public class ProductTests
 
     private static Product CreateValidProduct()
     {
-        return Product.Create(CreateValidName(), CreateValidPrice());
+        return Product.Create(CreateValidName(), CreateValidPrice(), TestTime);
     }
 
     [Fact]
@@ -161,10 +161,24 @@ public class ProductTests
     [Fact]
     public void Activate_WithZeroPrice_ShouldThrowProductDomainException()
     {
-        var product = Product.Create(CreateValidName(), CreateValidPrice(0));
+        var product = Product.Create(CreateValidName(), CreateValidPrice(0), TestTime);
 
         var exception = Assert.Throws<ProductDomainException>(() => product.Activate());
         Assert.Equal("product.activation_requires_price", exception.Code);
+    }
+
+    [Fact]
+    public void Create_ShouldRaiseProductCreatedDomainEvent()
+    {
+        var product = CreateValidProduct();
+
+        var domainEvent = Assert.Single(product.DomainEvents);
+
+        var createdEvent = Assert.IsType<ProductCreatedDomainEvent>(
+            domainEvent);
+
+        Assert.Equal(product.Id, createdEvent.ProductId);
+        Assert.Equal(TestTime, createdEvent.OccurredOnUtc);
     }
 
     [Fact]

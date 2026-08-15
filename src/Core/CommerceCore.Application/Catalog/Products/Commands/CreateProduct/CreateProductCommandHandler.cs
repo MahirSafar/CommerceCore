@@ -1,4 +1,5 @@
 ﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -6,10 +7,12 @@ using Mediator;
 namespace CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 
 public sealed class CreateProductCommandHandler(
-    ICommerceCoreDbContext dbContext)
+    ICommerceCoreDbContext dbContext,
+    IClock clock)
     : ICommandHandler<CreateProductCommand, CreateProductResult>
 {
     private readonly ICommerceCoreDbContext _dbContext = dbContext;
+    private readonly IClock _clock = clock;
 
     public async ValueTask<CreateProductResult> Handle(
         CreateProductCommand request,
@@ -25,7 +28,10 @@ public sealed class CreateProductCommandHandler(
 
         Money price = Money.Create(request.PriceAmount, request.Currency);
 
-        Product product = Product.Create(name, price);
+        Product product = Product.Create(
+            name,
+            price,
+            _clock.UtcNow);
 
         _dbContext.Products.Add(product);
 

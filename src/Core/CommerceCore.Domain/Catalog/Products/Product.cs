@@ -33,14 +33,27 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         Status = ProductStatus.Draft;
     }
 
-    public static Product Create(LocalizedText name, Money price)
+    public static Product Create(
+        LocalizedText name,
+        Money price,
+        DateTimeOffset createdAtUtc)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(price);
 
         EnsureValidName(name);
 
-        return new Product(ProductId.New(), name, price);
+        var product = new Product(
+            ProductId.New(),
+            name,
+            price);
+
+        product.RaiseDomainEvent(
+            new ProductCreatedDomainEvent(
+                product.Id,
+                createdAtUtc));
+
+        return product;
     }
 
     public bool ChangeName(LocalizedText newName)
