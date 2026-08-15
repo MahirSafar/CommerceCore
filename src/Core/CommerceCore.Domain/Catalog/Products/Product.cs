@@ -121,7 +121,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
     {
         EnsureNotArchived();
 
-        if (Status == ProductStatus.Inactive)
+        if (Status != ProductStatus.Active)
             return false;
 
         Status = ProductStatus.Inactive;

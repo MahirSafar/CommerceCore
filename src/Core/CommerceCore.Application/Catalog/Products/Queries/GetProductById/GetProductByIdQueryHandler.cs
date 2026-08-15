@@ -3,7 +3,7 @@ using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace CommerceCore.Application.Catalog.Products.Queries;
+namespace CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 
 public sealed class GetProductByIdQueryHandler(
     ICommerceCoreDbContext dbContext)

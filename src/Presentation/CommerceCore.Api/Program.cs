@@ -1,5 +1,5 @@
 using CommerceCore.Api.Common.Errors;
-using CommerceCore.Api.Endpoints.Products;
+using CommerceCore.Api.Endpoints.V1.Products;
 using CommerceCore.Api.Identity;
 using CommerceCore.Application;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;

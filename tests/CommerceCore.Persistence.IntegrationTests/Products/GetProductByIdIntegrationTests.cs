@@ -1,4 +1,4 @@
-using CommerceCore.Application.Catalog.Products.Queries;
+using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;

@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
 
-namespace CommerceCore.Application.Catalog.Products.Queries;
+namespace CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 
 public sealed class GetProductByIdQueryValidator
     : AbstractValidator<GetProductByIdQuery>

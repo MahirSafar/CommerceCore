@@ -10,38 +10,28 @@ namespace CommerceCore.Domain.UnitTests.Catalog.Products;
 
 public class ProductTests
 {
-    private static readonly DateTimeOffset TestTime = new(
-        2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset TestTime = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
 
-    private static LocalizedText CreateValidName(string text = "Test məhsulu")
-    {
-        var lang = LanguageCode.Create("en");
-        return LocalizedText.Create(lang, new Dictionary<LanguageCode, string> { { lang, text } });
-    }
+    private static LocalizedText CreateValidName(string text = "Test məhsulu") => 
+        LocalizedText.Create(LanguageCode.Create("en"), new Dictionary<LanguageCode, string> { { LanguageCode.Create("en"), text } });
 
-    private static Money CreateValidPrice(decimal amount = 100)
-    {
-        return Money.Create(amount, "USD");
-    }
+    private static Money CreateValidPrice(decimal amount = 100) => Money.Create(amount, "USD");
 
-    private static Product CreateValidProduct()
-    {
-        return Product.Create(CreateValidName(), CreateValidPrice(), TestTime);
-    }
-
+    private static Product CreateValidProduct() => Product.Create(CreateValidName(), CreateValidPrice(), TestTime);
+    
     [Fact]
     public void Archive_ShouldRaiseProductArchivedDomainEvent()
     {
-        var product = CreateValidProduct();
-        var archivedAtUtc = new DateTimeOffset(
+        Product product = CreateValidProduct();
+        DateTimeOffset archivedAtUtc = new DateTimeOffset(
             2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
 
-        var result = product.Archive(archivedAtUtc, "Admin");
+        bool result = product.Archive(archivedAtUtc, "Admin");
 
         Assert.True(result);
-        var domainEvent = product.DomainEvents.SingleOrDefault(e => e is ProductArchivedDomainEvent);
+        IDomainEvent? domainEvent = product.DomainEvents.SingleOrDefault(e => e is ProductArchivedDomainEvent);
         Assert.NotNull(domainEvent);
-        var archivedEvent = (ProductArchivedDomainEvent)domainEvent!;
+        ProductArchivedDomainEvent archivedEvent = (ProductArchivedDomainEvent)domainEvent!;
         Assert.Equal(product.Id, archivedEvent.ProductId);
         Assert.Equal("Admin", archivedEvent.ArchivedBy);
         Assert.Equal(archivedAtUtc, archivedEvent.ArchivedAtUtc);
@@ -51,15 +41,15 @@ public class ProductTests
     [Fact]
     public void Archive_IsIdempotent_SecondCallReturnsFalseAndNoNewEvent()
     {
-        var product = CreateValidProduct();
-        var archivedAtUtc = TestTime;
+        Product product = CreateValidProduct();
+        DateTimeOffset archivedAtUtc = TestTime;
 
-        var first = product.Archive(archivedAtUtc, "Admin");
+        bool first = product.Archive(archivedAtUtc, "Admin");
         Assert.True(first);
 
-        var beforeCount = product.DomainEvents.Count;
+        int beforeCount = product.DomainEvents.Count;
 
-        var second = product.Archive(archivedAtUtc.AddMinutes(1), "Admin2");
+        bool second = product.Archive(archivedAtUtc.AddMinutes(1), "Admin2");
         Assert.False(second);
         Assert.Equal(beforeCount, product.DomainEvents.Count);
     }
@@ -67,58 +57,58 @@ public class ProductTests
     [Fact]
     public void Restore_IsIdempotent_SecondCallReturnsFalse()
     {
-        var product = CreateValidProduct();
-        var archivedAtUtc = TestTime;
+        Product product = CreateValidProduct();
+        DateTimeOffset archivedAtUtc = TestTime;
         product.Archive(archivedAtUtc, "Admin");
 
-        var first = product.Restore();
+        bool first = product.Restore();
         Assert.True(first);
 
-        var second = product.Restore();
+        bool second = product.Restore();
         Assert.False(second);
     }
 
     [Fact]
     public void ChangePrice_CurrencyChange_ThrowsProductDomainException()
     {
-        var product = CreateValidProduct();
-        var newPrice = Money.Create(100, "EUR");
+        Product product = CreateValidProduct();
+        Money newPrice = Money.Create(100, "EUR");
 
-        var ex = Assert.Throws<ProductDomainException>(() => product.ChangePrice(newPrice));
+        ProductDomainException ex = Assert.Throws<ProductDomainException>(() => product.ChangePrice(newPrice));
         Assert.Equal("product.currency_change_not_allowed", ex.Code);
     }
 
     [Fact]
     public void ChangeName_SameValue_ReturnsFalse_And_ChangePrice_SameValue_ReturnsFalse()
     {
-        var product = CreateValidProduct();
-        var sameName = product.Name;
-        var samePrice = product.Price;
+        Product product = CreateValidProduct();
+        LocalizedText sameName = product.Name;
+        Money samePrice = product.Price;
 
-        var nameResult = product.ChangeName(sameName);
+        bool nameResult = product.ChangeName(sameName);
         Assert.False(nameResult);
 
-        var priceResult = product.ChangePrice(samePrice);
+        bool priceResult = product.ChangePrice(samePrice);
         Assert.False(priceResult);
     }
 
     [Fact]
     public void ActiveProduct_ChangePriceToZero_ThrowsProductDomainException()
     {
-        var product = CreateValidProduct();
+        Product product = CreateValidProduct();
         product.Activate();
 
-        var ex = Assert.Throws<ProductDomainException>(() => product.ChangePrice(Money.Create(0m, product.Price.Currency)));
+        ProductDomainException ex = Assert.Throws<ProductDomainException>(() => product.ChangePrice(Money.Create(0m, product.Price.Currency)));
         Assert.Equal("product.active_price_must_be_positive", ex.Code);
     }
 
     [Fact]
     public void Archive_SetsDeletionFields()
     {
-        var product = CreateValidProduct();
-        var archivedAt = TestTime;
+        Product product = CreateValidProduct();
+        DateTimeOffset archivedAt = TestTime;
 
-        var result = product.Archive(archivedAt, "Admin");
+        bool result = product.Archive(archivedAt, "Admin");
 
         Assert.True(result);
         Assert.True(product.IsDeleted);
@@ -129,16 +119,16 @@ public class ProductTests
     [Fact]
     public void Archive_WithNonUtcOffset_PreservesUtc()
     {
-        var product = CreateValidProduct();
-        var localTime = new DateTimeOffset(2026, 8, 13, 15, 0, 0, TimeSpan.FromHours(3));
+        Product product = CreateValidProduct();
+        DateTimeOffset localTime = new DateTimeOffset(2026, 8, 13, 15, 0, 0, TimeSpan.FromHours(3));
 
-        var result = product.Archive(localTime, "Admin");
+        bool result = product.Archive(localTime, "Admin");
 
         Assert.True(result);
-        var expectedUtc = localTime.ToUniversalTime();
+        DateTimeOffset expectedUtc = localTime.ToUniversalTime();
         Assert.Equal(expectedUtc, product.DeletedAtUtc);
 
-        var domainEvent = product.DomainEvents.OfType<ProductArchivedDomainEvent>().Single();
+        ProductArchivedDomainEvent domainEvent = product.DomainEvents.OfType<ProductArchivedDomainEvent>().Single();
         Assert.Equal(expectedUtc, domainEvent.ArchivedAtUtc);
         Assert.Equal(expectedUtc, domainEvent.OccurredOnUtc);
     }
@@ -146,35 +136,35 @@ public class ProductTests
     [Fact]
     public void ArchivedProduct_ShouldNotAllowNameOrPriceChanges()
     {
-        var product = CreateValidProduct();
+        Product product = CreateValidProduct();
         product.Archive(TestTime, "Admin");
-        var newName = CreateValidName("Yeni Ad");
-        var newPrice = CreateValidPrice(200);
+        LocalizedText newName = CreateValidName("Yeni Ad");
+        Money newPrice = CreateValidPrice(200);
 
-        var nameException = Assert.Throws<ProductDomainException>(() => product.ChangeName(newName));
+        ProductDomainException nameException = Assert.Throws<ProductDomainException>(() => product.ChangeName(newName));
         Assert.Equal("product.archived", nameException.Code);
 
-        var priceException = Assert.Throws<ProductDomainException>(() => product.ChangePrice(newPrice));
+        ProductDomainException priceException = Assert.Throws<ProductDomainException>(() => product.ChangePrice(newPrice));
         Assert.Equal("product.archived", priceException.Code);
     }
 
     [Fact]
     public void Activate_WithZeroPrice_ShouldThrowProductDomainException()
     {
-        var product = Product.Create(CreateValidName(), CreateValidPrice(0), TestTime);
+        Product product = Product.Create(CreateValidName(), CreateValidPrice(0), TestTime);
 
-        var exception = Assert.Throws<ProductDomainException>(() => product.Activate());
+        ProductDomainException exception = Assert.Throws<ProductDomainException>(() => product.Activate());
         Assert.Equal("product.activation_requires_price", exception.Code);
     }
 
     [Fact]
     public void Create_ShouldRaiseProductCreatedDomainEvent()
     {
-        var product = CreateValidProduct();
+        Product product = CreateValidProduct();
 
-        var domainEvent = Assert.Single(product.DomainEvents);
+        IDomainEvent domainEvent = Assert.Single(product.DomainEvents);
 
-        var createdEvent = Assert.IsType<ProductCreatedDomainEvent>(
+        ProductCreatedDomainEvent createdEvent = Assert.IsType<ProductCreatedDomainEvent>(
             domainEvent);
 
         Assert.Equal(product.Id, createdEvent.ProductId);
@@ -184,7 +174,7 @@ public class ProductTests
     [Fact]
     public void Restore_ShouldSetStatusToInactive_IfProductWasActiveBeforeArchiving()
     {
-        var product = CreateValidProduct();
+        Product product = CreateValidProduct();
         product.Activate();
         product.Archive(TestTime, "Admin");
 
@@ -196,7 +186,7 @@ public class ProductTests
     [Fact]
     public void ClearDomainEvents_ShouldEmptyDomainEventsCollection()
     {
-        var product = CreateValidProduct();
+        Product product = CreateValidProduct();
         product.Archive(TestTime, "System");
 
         Assert.NotEmpty(product.DomainEvents);
@@ -204,5 +194,52 @@ public class ProductTests
         ((IHasDomainEvents)product).ClearDomainEvents();
 
         Assert.Empty(product.DomainEvents);
+    }
+
+    [Fact]
+    public void Activate_WithPositivePrice_SetsStatusToActive()
+    {
+        Product product = CreateValidProduct();
+
+        bool result = product.Activate();
+
+        Assert.True(result);
+        Assert.Equal(ProductStatus.Active, product.Status);
+    }
+
+    [Fact]
+    public void Activate_WhenAlreadyActive_ReturnsFalse()
+    {
+        Product product = CreateValidProduct();
+
+        product.Activate();
+
+        bool result = product.Activate();
+
+        Assert.False(result);
+        Assert.Equal(ProductStatus.Active, product.Status);
+    }
+
+    [Fact]
+    public void Deactivate_WhenProductIsActive_SetsStatusToInactive()
+    {
+        Product product = CreateValidProduct();
+        product.Activate();
+
+        bool result = product.Deactivate();
+
+        Assert.True(result);
+        Assert.Equal(ProductStatus.Inactive, product.Status);
+    }
+
+    [Fact]
+    public void Deactivate_WhenProductIsDraft_ReturnsFalse()
+    {
+        Product product = CreateValidProduct();
+
+        bool result = product.Deactivate();
+
+        Assert.False(result);
+        Assert.Equal(ProductStatus.Draft, product.Status);
     }
 }

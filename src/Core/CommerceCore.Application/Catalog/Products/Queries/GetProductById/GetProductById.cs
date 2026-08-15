@@ -1,6 +1,6 @@
 ﻿using Mediator;
 
-namespace CommerceCore.Application.Catalog.Products.Queries;
+namespace CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 
 public sealed record GetProductByIdQuery(Guid ProductId)
     : IQuery<GetProductByIdResult?>;

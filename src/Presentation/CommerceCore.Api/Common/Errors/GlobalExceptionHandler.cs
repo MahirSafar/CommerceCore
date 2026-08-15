@@ -2,6 +2,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace CommerceCore.Api.Common.Errors;
 
@@ -115,6 +116,22 @@ public sealed class GlobalExceptionHandler(
             problem,
             cancellationToken);
     }
+
+    private static Task WriteConcurrencyProblemAsync(HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        ProblemDetails problem = new()
+        {
+            Type = "/problems/concurrency-conflict",
+            Title = "The resource was modified by another request.",
+            Detail = "Reload the resource and try again.",
+            Status = StatusCodes.Status409Conflict,
+            Instance = httpContext.Request.Path
+        };
+
+        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        return WriteProblemAsync(httpContext, problem, cancellationToken);
+    }
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -145,6 +162,12 @@ public sealed class GlobalExceptionHandler(
 
                 return true;
 
+            case DbUpdateConcurrencyException:
+                await WriteConcurrencyProblemAsync(
+                    httpContext,
+                    cancellationToken);
+
+                return true;
             default:
                 _logger.LogError(
                     exception,
