@@ -1,9 +1,11 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
-using CommerceCore.Application.Common.Abstractions;
+﻿using CommerceCore.Application.Common.Abstractions;
+using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Factories;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using Mediator;
+
 namespace CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 
 public sealed class CreateProductCommandHandler(
@@ -15,18 +17,16 @@ public sealed class CreateProductCommandHandler(
     private readonly IClock _clock = clock;
 
     public async ValueTask<CreateProductResult> Handle(
-        CreateProductCommand request,
+        CreateProductCommand command,
         CancellationToken cancellationToken)
     {
-        LanguageCode defaultLanguage = LanguageCode.Create(request.DefaultLanguage);
+        LocalizedText name = LocalizedTextFactory.Create(
+            command.DefaultLanguage,
+            command.NameTranslations);
 
-        IEnumerable<KeyValuePair<LanguageCode, string>> translations = request.NameTranslations.Select(translations =>
-            new KeyValuePair<LanguageCode, string>(
-                LanguageCode.Create(translations.Key), translations.Value));
-
-        LocalizedText name = LocalizedText.Create(defaultLanguage, translations);
-
-        Money price = Money.Create(request.PriceAmount, request.Currency);
+        Money price = Money.Create(
+            command.PriceAmount,
+            command.Currency);
 
         Product product = Product.Create(
             name,
