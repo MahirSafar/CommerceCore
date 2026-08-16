@@ -1,5 +1,6 @@
 ﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
@@ -227,6 +228,39 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
+        group.MapPut(
+            "{productId:guid}/name",
+            async (
+                Guid productId,
+                ChangeProductNameRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                ChangeProductNameResult? result = await mediator.Send(
+                    new ChangeProductNameCommand(
+                        productId,
+                        request.DefaultLanguage ?? string.Empty,
+                        request.NameTranslations ?? []),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductNotFound();
+
+                return Results.Ok(
+                    new ProductNameResponse(
+                        result.ProductId,
+                        result.DefaultLanguage,
+                        result.NameTranslations,
+                        result.Status));
+            })
+        .WithName("ChangeProductName")
+        .Produces<ProductNameResponse>(StatusCodes.Status200OK)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
         return endpoints;
     }
     public sealed record ActivateProductResponse(Guid ProductId, string Status);
@@ -235,13 +269,9 @@ public static class ProductEndpoints
     public sealed record RestoreProductResponse(Guid ProductId, string Status, bool Restored);
     public sealed record ChangeProductPriceRequest(decimal PriceAmount, string? Currency);
     public sealed record ProductPriceResponse(Guid ProductId, decimal PriceAmount, string Currency, string Status);
-    public sealed record GetProductResponse(
-        Guid ProductId,
-        string DefaultLanguage,
-        IReadOnlyDictionary<string, string> NameTranslations,
-        decimal PriceAmount,
-        string Currency,
-        string Status);
+    public sealed record ChangeProductNameRequest(string? DefaultLanguage, Dictionary<string, string>? NameTranslations);
+    public sealed record ProductNameResponse(Guid ProductId, string DefaultLanguage, IReadOnlyDictionary<string, string> NameTranslations, string Status);
+    public sealed record GetProductResponse(Guid ProductId, string DefaultLanguage, IReadOnlyDictionary<string, string> NameTranslations, decimal PriceAmount, string Currency, string Status);
 
     private static IResult ProductNotFound() => Results.Problem(
             statusCode: StatusCodes.Status404NotFound,
