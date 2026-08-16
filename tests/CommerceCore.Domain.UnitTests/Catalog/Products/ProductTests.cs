@@ -242,4 +242,28 @@ public class ProductTests
         Assert.False(result);
         Assert.Equal(ProductStatus.Draft, product.Status);
     }
+
+    [Fact]
+    public void ChangeName_WithDifferentLocalizedText_ChangesName()
+    {
+        Product product = CreateValidProduct();
+
+        LocalizedText newName = LocalizedText.Create(
+            LanguageCode.Create("az"),
+            [
+                new KeyValuePair<LanguageCode, string>(
+                LanguageCode.Create("az"),
+                "Yeni məhsul adı"),
+            new KeyValuePair<LanguageCode, string>(
+                LanguageCode.Create("en"),
+                "New product name")
+            ]);
+
+        bool changed = product.ChangeName(newName);
+
+        Assert.True(changed);
+        Assert.Equal("az", product.Name.DefaultLanguage.Value);
+        Assert.Equal("Yeni məhsul adı", product.Name.Get(LanguageCode.Create("az")));
+        Assert.Equal("New product name", product.Name.Get(LanguageCode.Create("en")));
+    }
 }

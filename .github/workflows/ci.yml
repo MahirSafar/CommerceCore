@@ -1,0 +1,42 @@
+name: CommerceCore CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Restore NuGet Packages
+        run: dotnet restore CommerceCore.slnx
+
+      - name: Build Solution (Release Mode)
+        run: dotnet build CommerceCore.slnx --no-restore --configuration Release
+
+      - name: Run Domain Unit Tests
+        run: dotnet test tests/CommerceCore.Domain.UnitTests/CommerceCore.Domain.UnitTests.csproj --no-build --configuration Release --verbosity normal
+
+      - name: Run Architecture Tests
+        run: dotnet test tests/CommerceCore.ArchitectureTests/CommerceCore.ArchitectureTests.csproj --no-build --configuration Release --verbosity normal
+
+      - name: Run Persistence Integration Tests (Testcontainers)
+        run: dotnet test tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj --no-build --configuration Release --verbosity normal
