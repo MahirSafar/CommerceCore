@@ -11,7 +11,7 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
     private readonly List<AttributeOption> _options = [];
     private readonly ReadOnlyCollection<AttributeOption> _readOnlyOptions;
 
-    public AttributeDefinition() => _readOnlyOptions = _options.AsReadOnly();
+    private AttributeDefinition() => _readOnlyOptions = _options.AsReadOnly();
 
     private AttributeDefinition(
         AttributeDefinitionId id,
