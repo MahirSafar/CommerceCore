@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
@@ -108,6 +108,13 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
             throw new ProductTypeDomainException(
                 "product_type.duplicate_attribute_key",
                 $"Attribute key '{key}' already exists on product type '{Code}'.");
+        }
+
+        if (_attributeDefinitions.Any(item => item.DisplayOrder == displayOrder))
+        {
+            throw new ProductTypeDomainException(
+                "product_type.duplicate_attribute_display_order",
+                $"Display order '{displayOrder}' is already used by product type '{Code}'.");
         }
 
         AttributeDefinition definition = AttributeDefinition.Create(

@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
@@ -73,6 +73,29 @@ public sealed class ProductTypeTests
                 displayOrder: 1));
 
         Assert.Equal("product_type.duplicate_attribute_key", exception.Code);
+    }
+
+    [Fact]
+    public void DefineAttribute_WithDuplicateDisplayOrder_ThrowsDomainException()
+    {
+        ProductType productType = CreateProductType();
+
+        productType.DefineAttribute(
+            AttributeKey.Create("color"),
+            AttributeDataType.SingleSelect,
+            AttributeScope.VariantOption,
+            isRequired: true,
+            displayOrder: 0);
+
+        ProductTypeDomainException exception = Assert.Throws<ProductTypeDomainException>(() =>
+            productType.DefineAttribute(
+                AttributeKey.Create("size"),
+                AttributeDataType.SingleSelect,
+                AttributeScope.VariantOption,
+                isRequired: false,
+                displayOrder: 0));
+
+        Assert.Equal("product_type.duplicate_attribute_display_order", exception.Code);
     }
 
     [Fact]
