@@ -5,7 +5,7 @@ namespace CommerceCore.Domain.Catalog.ProductTypes;
 
 public sealed class AttributeOption : BaseEntity<AttributeOptionId>
 {
-    public AttributeOption()
+    private AttributeOption()
     {
     }
 
