@@ -8,6 +8,8 @@ namespace CommerceCore.Persistence.Migrations
     /// <inheritdoc />
     public partial class AddProductTypes : Migration
     {
+        private static readonly string[] columns = ["product_type_id", "key"];
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -102,28 +104,28 @@ namespace CommerceCore.Persistence.Migrations
                 name: "ux_attribute_definitions_product_type_display_order",
                 schema: "catalog",
                 table: "attribute_definitions",
-                columns: new[] { "product_type_id", "display_order" },
+                columns: ["product_type_id", "display_order"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ux_attribute_definitions_product_type_key",
                 schema: "catalog",
                 table: "attribute_definitions",
-                columns: new[] { "product_type_id", "key" },
+                columns: columns,
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ux_attribute_options_definition_code",
                 schema: "catalog",
                 table: "attribute_options",
-                columns: new[] { "attribute_definition_id", "code" },
+                columns: ["attribute_definition_id", "code"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ux_attribute_options_definition_display_order",
                 schema: "catalog",
                 table: "attribute_options",
-                columns: new[] { "attribute_definition_id", "display_order" },
+                columns: ["attribute_definition_id", "display_order"],
                 unique: true);
 
             migrationBuilder.CreateIndex(
