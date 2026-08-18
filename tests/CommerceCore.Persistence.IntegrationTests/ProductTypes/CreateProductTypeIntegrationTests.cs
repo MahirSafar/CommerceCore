@@ -1,4 +1,5 @@
-﻿using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
+using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
+using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
@@ -22,7 +23,10 @@ public sealed class CreateProductTypeIntegrationTests(
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        CreateProductTypeCommandHandler handler = new(dbContext);
+        IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
+            .GetRequiredService<IProductTypeSchemaCoordinator>();
+
+        CreateProductTypeCommandHandler handler = new(dbContext, schemaCoordinator);
 
         CreateProductTypeResult rootResult = await handler.Handle(
             new CreateProductTypeCommand(
@@ -65,7 +69,10 @@ public sealed class CreateProductTypeIntegrationTests(
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        CreateProductTypeCommandHandler handler = new(dbContext);
+        IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
+            .GetRequiredService<IProductTypeSchemaCoordinator>();
+
+        CreateProductTypeCommandHandler handler = new(dbContext, schemaCoordinator);
 
         ProductTypeDomainException exception = await Assert.ThrowsAsync<ProductTypeDomainException>(
             () => handler.Handle(
