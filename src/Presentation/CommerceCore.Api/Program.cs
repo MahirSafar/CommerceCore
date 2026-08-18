@@ -1,5 +1,6 @@
 using CommerceCore.Api.Common.Errors;
 using CommerceCore.Api.Endpoints.V1.Products;
+using CommerceCore.Api.Endpoints.V1.ProductTypes;
 using CommerceCore.Api.Identity;
 using CommerceCore.Application;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
@@ -43,6 +44,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.MapProductEndpoints();
+app.MapProductTypeEndpoints();
 
 app.Run();
 
