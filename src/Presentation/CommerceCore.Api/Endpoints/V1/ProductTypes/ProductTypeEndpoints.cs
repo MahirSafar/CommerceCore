@@ -6,15 +6,16 @@ namespace CommerceCore.Api.Endpoints.V1.ProductTypes;
 public static class ProductTypeEndpoints
 {
     public sealed record CreateProductTypeRequest(
-        string? code,
+        string? Code,
         Guid? ParentProductTypeId,
         bool IsAssignable);
 
     public sealed record CreateProductTypeResponse(Guid ProductTypeId);
 
-    public static IEndpointRouteBuilder MapProductTypeEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapProductTypeEndpoints(
+        this IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder group = endpoints
+        var group = endpoints
             .MapGroup("/api/product-types")
             .WithTags("Product Types");
 
@@ -27,7 +28,7 @@ public static class ProductTypeEndpoints
             {
                 CreateProductTypeResult result = await mediator.Send(
                     new CreateProductTypeCommand(
-                        request.code ?? string.Empty,
+                        request.Code ?? string.Empty,
                         request.ParentProductTypeId,
                         request.IsAssignable),
                     cancellationToken);
