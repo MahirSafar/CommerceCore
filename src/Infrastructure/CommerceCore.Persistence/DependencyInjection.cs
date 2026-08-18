@@ -1,5 +1,6 @@
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.Interceptors;
+using CommerceCore.Persistence.ProductTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +14,8 @@ public static class DependencyInjection
 
         services.AddScoped<AuditingSaveChangesInterceptor>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
+
+        services.AddScoped<IProductTypeSchemaCoordinator, ProductTypeSchemaCoordinator>();
 
         services.AddDbContext<CommerceCoreDbContext>(
             (serviceProvider, options) =>

@@ -8,10 +8,13 @@ using Microsoft.EntityFrameworkCore;
 namespace CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 
 public sealed class CreateProductTypeCommandHandler(
-    ICommerceCoreDbContext dbContext)
+    ICommerceCoreDbContext dbContext,
+    IProductTypeSchemaCoordinator schemaCoordinator)
     : ICommandHandler<CreateProductTypeCommand, CreateProductTypeResult>
 {
     private readonly ICommerceCoreDbContext _dbContext = dbContext;
+    private readonly IProductTypeSchemaCoordinator _schemaCoordinator =
+        schemaCoordinator;
 
     public async ValueTask<CreateProductTypeResult> Handle(
         CreateProductTypeCommand command,
@@ -35,7 +38,8 @@ public sealed class CreateProductTypeCommandHandler(
 
         if (command.ParentProductTypeId is Guid parentProductTypeGuid)
         {
-            ProductTypeId parentProductTypeId = ProductTypeId.From(parentProductTypeGuid);
+            ProductTypeId parentProductTypeId = ProductTypeId.From(
+                parentProductTypeGuid);
 
             bool parentExists = await _dbContext.ProductTypes
                 .AnyAsync(
@@ -61,9 +65,16 @@ public sealed class CreateProductTypeCommandHandler(
                 command.IsAssignable);
         }
 
-        _dbContext.ProductTypes.Add(productType);
+        await _schemaCoordinator.ExecuteCreationAsync(
+            productType.Id,
+            productType.ParentProductTypeId,
+            async token =>
+            {
+                _dbContext.ProductTypes.Add(productType);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+                await _dbContext.SaveChangesAsync(token);
+            },
+            cancellationToken);
 
         return new CreateProductTypeResult(productType.Id.Value);
     }
