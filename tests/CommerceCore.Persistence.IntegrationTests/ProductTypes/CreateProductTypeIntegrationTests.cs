@@ -1,9 +1,11 @@
+using System.Text.Json;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Persistence.ProductTypes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -57,6 +59,22 @@ public sealed class CreateProductTypeIntegrationTests(
 
         Assert.True(child.IsAssignable);
         Assert.Equal("integration-test", child.CreatedBy);
+
+        var effectiveSchema = await dbContext
+            .Set<ProductTypeEffectiveSchema>()
+            .SingleAsync(
+                schema => schema.ProductTypeId == child.Id,
+                cancellationToken);
+
+        Assert.True(child.SchemaVersion > 0);
+        Assert.Equal(child.SchemaVersion, effectiveSchema.SchemaVersion);
+
+        using var document = JsonDocument.Parse(effectiveSchema.Schema);
+
+        var attributes = document.RootElement.GetProperty("attributes");
+
+        Assert.Equal(JsonValueKind.Array, attributes.ValueKind);
+        Assert.Equal(0, attributes.GetArrayLength());
     }
 
     [Fact]
