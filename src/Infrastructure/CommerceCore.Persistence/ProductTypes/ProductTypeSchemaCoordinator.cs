@@ -98,19 +98,25 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
         Func<IDbContextTransaction, Task> action,
         CancellationToken cancellationToken)
     {
-        await using IDbContextTransaction transaction = await _dbContext.Database
-            .BeginTransactionAsync(cancellationToken);
+        IExecutionStrategy executionStrategy =
+            _dbContext.Database.CreateExecutionStrategy();
 
-        try
+        await executionStrategy.ExecuteAsync(async () =>
         {
-            await action(transaction);
-            await transaction.CommitAsync(cancellationToken);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            await using IDbContextTransaction transaction = await _dbContext.Database
+                .BeginTransactionAsync(cancellationToken);
+
+            try
+            {
+                await action(transaction);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     private async Task<Guid> GetTreeRootIdAsync(
