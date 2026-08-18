@@ -22,7 +22,7 @@ public sealed class CreateProductTypeIntegrationTests(
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        CreateProductTypeCommandHandler handler = new CreateProductTypeCommandHandler(dbContext);
+        CreateProductTypeCommandHandler handler = new(dbContext);
 
         CreateProductTypeResult rootResult = await handler.Handle(
             new CreateProductTypeCommand(
