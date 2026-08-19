@@ -16,7 +16,7 @@ public static class DependencyInjection
         services.AddScoped<OutboxSaveChangesInterceptor>();
 
         services.AddScoped<IProductTypeSchemaCoordinator, ProductTypeSchemaCoordinator>();
-
+        services.AddScoped<IAttributeDefinitionRegistry, AttributeDefinitionRegistry>();
         services.AddDbContext<CommerceCoreDbContext>(
             (serviceProvider, options) =>
             {

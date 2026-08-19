@@ -9,12 +9,13 @@ namespace CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute
 
 public sealed class DefineAttributeCommandHandler(
     ICommerceCoreDbContext dbContext,
-    IProductTypeSchemaCoordinator schemaCoordinator)
+    IProductTypeSchemaCoordinator schemaCoordinator,
+    IAttributeDefinitionRegistry attributeDefinitionRegistry)
     : ICommandHandler<DefineAttributeCommand, DefineAttributeResult>
 {
     private readonly ICommerceCoreDbContext _dbContext = dbContext;
     private readonly IProductTypeSchemaCoordinator _schemaCoordinator = schemaCoordinator;
-
+    private readonly IAttributeDefinitionRegistry _attributeDefinitionRegistry = attributeDefinitionRegistry;
     public async ValueTask<DefineAttributeResult> Handle(
         DefineAttributeCommand command,
         CancellationToken cancellationToken)
@@ -43,6 +44,11 @@ public sealed class DefineAttributeCommandHandler(
             productTypeId,
             async token =>
             {
+                await _attributeDefinitionRegistry.EnsureKeyIsUniqueInHierarchyAsync(
+                    productTypeId,
+                    key,
+                    token);
+
                 attributeDefinition = productType.DefineAttribute(
                     key,
                     command.DataType,
