@@ -35,7 +35,7 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
         ParentProductTypeId = parentProductTypeId;
         IsAssignable = isAssignable;
 
-        SchemaVersion = 0;
+        OwnSchemaVersion = 0;
     }
 
     public ProductTypeCode Code { get; private set; }
@@ -44,8 +44,7 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
 
     public bool IsAssignable { get; private set; }
 
-    public long SchemaVersion { get; private set; }
-
+    public long OwnSchemaVersion { get; private set; }
     public IReadOnlyCollection<AttributeDefinition> AttributeDefinitions =>
         _readOnlyAttributeDefinitions;
 

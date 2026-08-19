@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.AddAttributeOption;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
@@ -73,7 +73,13 @@ public sealed class AddAttributeOptionIntegrationTests(
             item => item.Id == ProductTypeId.From(childResult.ProductTypeId),
             cancellationToken);
 
-        long childPreviousSchemaVersion = childBeforeOption.SchemaVersion;
+        long childPreviousSchemaVersion = childBeforeOption.OwnSchemaVersion;
+
+        ProductTypeEffectiveSchema childEffectiveSchemaBefore = await dbContext
+            .Set<ProductTypeEffectiveSchema>()
+            .SingleAsync(
+                item => item.ProductTypeId == childBeforeOption.Id,
+                cancellationToken);
 
         AddAttributeOptionCommandHandler addOptionHandler = new(
             dbContext,
@@ -100,10 +106,14 @@ public sealed class AddAttributeOptionIntegrationTests(
                 cancellationToken);
 
         Assert.NotEqual(Guid.Empty, optionResult.AttributeOptionId);
-        Assert.True(childAfterOption.SchemaVersion > childPreviousSchemaVersion);
         Assert.Equal(
-            childAfterOption.SchemaVersion,
-            childEffectiveSchema.SchemaVersion);
+            childPreviousSchemaVersion,
+            childAfterOption.OwnSchemaVersion);
+
+        Assert.True(childEffectiveSchema.EffectiveSchemaVersion > 0);
+        Assert.True(
+            childEffectiveSchema.EffectiveSchemaVersion >
+            childEffectiveSchemaBefore.EffectiveSchemaVersion);
 
         using JsonDocument document = JsonDocument.Parse(childEffectiveSchema.Schema);
 

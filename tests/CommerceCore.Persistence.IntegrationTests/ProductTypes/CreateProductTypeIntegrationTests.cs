@@ -66,8 +66,8 @@ public sealed class CreateProductTypeIntegrationTests(
                 schema => schema.ProductTypeId == child.Id,
                 cancellationToken);
 
-        Assert.True(child.SchemaVersion > 0);
-        Assert.Equal(child.SchemaVersion, effectiveSchema.SchemaVersion);
+        Assert.Equal(0, child.OwnSchemaVersion);
+        Assert.True(effectiveSchema.EffectiveSchemaVersion > 0);
 
         using var document = JsonDocument.Parse(effectiveSchema.Schema);
 
