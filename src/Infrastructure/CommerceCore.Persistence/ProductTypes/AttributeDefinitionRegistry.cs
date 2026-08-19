@@ -33,7 +33,7 @@ internal sealed class AttributeDefinitionRegistry(
             ?? throw new InvalidOperationException(
                 "CommerceCore requires an Npgsql PostgreSQL transaction.");
 
-        await using NpgsqlCommand command = new NpgsqlCommand(
+        await using NpgsqlCommand command = new(
             """
             SELECT EXISTS (
                 SELECT 1
