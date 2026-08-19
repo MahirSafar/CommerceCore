@@ -1,4 +1,5 @@
-﻿using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
+﻿using CommerceCore.Application.Catalog.ProductTypes.Commands.AddAttributeOption;
+using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using Mediator;
@@ -27,7 +28,8 @@ public static class ProductTypeEndpoints
         string? MeasurementUnitFamily);
 
     public sealed record DefineAttributeResponse(Guid AttributeDefinitionId);
-
+    public sealed record AddAttributeOptionRequest(string? Code, int DisplayOrder);
+    public sealed record AddAttributeOptionResponse(Guid AttributeOptionId);
     public static IEndpointRouteBuilder MapProductTypeEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -117,6 +119,33 @@ public static class ProductTypeEndpoints
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
+        group.MapPost(
+            "{productTypeId:guid}/attributes/{attributeDefinitionId:guid}/options",
+            async (
+                Guid productTypeId,
+                Guid attributeDefinitionId,
+                AddAttributeOptionRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                AddAttributeOptionResult result = await mediator.Send(
+                    new AddAttributeOptionCommand(
+                        productTypeId,
+                        attributeDefinitionId,
+                        request.Code ?? string.Empty,
+                        request.DisplayOrder),
+                    cancellationToken);
+
+                return Results.Created(
+                    $"/api/product-types/{productTypeId}/attributes/" +
+                    $"{attributeDefinitionId}/options/{result.AttributeOptionId}",
+                    new AddAttributeOptionResponse(result.AttributeOptionId));
+            })
+            .WithName("AddProductTypeAttributeOption")
+            .Produces<AddAttributeOptionResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
         return endpoints;
     }
 
