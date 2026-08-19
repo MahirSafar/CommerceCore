@@ -29,6 +29,9 @@ public sealed class DefineAttributeIntegrationTests(
         IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
             .GetRequiredService<IProductTypeSchemaCoordinator>();
 
+        IAttributeDefinitionRegistry attributeDefinitionRegistry = scope.ServiceProvider
+            .GetRequiredService<IAttributeDefinitionRegistry>();
+
         CreateProductTypeCommandHandler createProductTypeHandler = new(
             dbContext,
             schemaCoordinator);
@@ -68,7 +71,8 @@ public sealed class DefineAttributeIntegrationTests(
 
         DefineAttributeCommandHandler defineAttributeHandler = new(
             dbContext,
-            schemaCoordinator);
+            schemaCoordinator,
+            attributeDefinitionRegistry);
 
         DefineAttributeResult result = await defineAttributeHandler.Handle(
             new DefineAttributeCommand(
