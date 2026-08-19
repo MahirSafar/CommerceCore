@@ -29,7 +29,7 @@ public sealed class DefineAttributeIntegrationTests(
         IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
             .GetRequiredService<IProductTypeSchemaCoordinator>();
 
-        CreateProductTypeCommandHandler createProductTypeHandler = new CreateProductTypeCommandHandler(
+        CreateProductTypeCommandHandler createProductTypeHandler = new(
             dbContext,
             schemaCoordinator);
 
@@ -57,10 +57,10 @@ public sealed class DefineAttributeIntegrationTests(
             item => item.Id == ProductTypeId.From(childResult.ProductTypeId),
             cancellationToken);
 
-        long rootPreviousVersion = rootBeforeChange.SchemaVersion;
-        long childPreviousVersion = childBeforeChange.SchemaVersion;
+        long rootPreviousVersion = rootBeforeChange.OwnSchemaVersion;
+        long childPreviousVersion = childBeforeChange.OwnSchemaVersion;
 
-        DefineAttributeCommandHandler defineAttributeHandler = new DefineAttributeCommandHandler(
+        DefineAttributeCommandHandler defineAttributeHandler = new(
             dbContext,
             schemaCoordinator);
 
@@ -97,16 +97,26 @@ public sealed class DefineAttributeIntegrationTests(
 
         Assert.NotEqual(Guid.Empty, result.AttributeDefinitionId);
 
-        Assert.True(rootAfterChange.SchemaVersion > rootPreviousVersion);
-        Assert.True(childAfterChange.SchemaVersion > childPreviousVersion);
+        Assert.True(rootAfterChange.OwnSchemaVersion > rootPreviousVersion);
+        Assert.Equal(
+            rootPreviousVersion + 1,
+            rootAfterChange.OwnSchemaVersion);
 
         Assert.Equal(
-            rootAfterChange.SchemaVersion,
-            childAfterChange.SchemaVersion);
+            childPreviousVersion,
+            childAfterChange.OwnSchemaVersion);
+
+        Assert.True(childEffectiveSchema.EffectiveSchemaVersion > 0);
+
+        ProductTypeEffectiveSchema rootEffectiveSchema = await dbContext
+            .Set<ProductTypeEffectiveSchema>()
+            .SingleAsync(
+                item => item.ProductTypeId == rootAfterChange.Id,
+                cancellationToken);
 
         Assert.Equal(
-            childAfterChange.SchemaVersion,
-            childEffectiveSchema.SchemaVersion);
+            rootEffectiveSchema.EffectiveSchemaVersion,
+            childEffectiveSchema.EffectiveSchemaVersion);
 
         using JsonDocument document = JsonDocument.Parse(childEffectiveSchema.Schema);
 

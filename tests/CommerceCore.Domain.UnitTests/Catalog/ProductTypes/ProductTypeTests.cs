@@ -16,7 +16,7 @@ public sealed class ProductTypeTests
         Assert.Equal("electronics", productType.Code.Value);
         Assert.Null(productType.ParentProductTypeId);
         Assert.False(productType.IsAssignable);
-        Assert.Equal(0, productType.SchemaVersion);
+        Assert.Equal(0, productType.OwnSchemaVersion);
     }
 
     [Fact]

@@ -23,8 +23,8 @@ public sealed class ProductTypeEffectiveSchemaConfiguration : IEntityTypeConfigu
                 value => ProductTypeId.From(value))
             .ValueGeneratedNever();
 
-        builder.Property(schema => schema.SchemaVersion)
-            .HasColumnName("schema_version")
+        builder.Property(schema => schema.EffectiveSchemaVersion)
+            .HasColumnName("effective_schema_version")
             .HasDefaultValue(0L)
             .IsRequired();
 

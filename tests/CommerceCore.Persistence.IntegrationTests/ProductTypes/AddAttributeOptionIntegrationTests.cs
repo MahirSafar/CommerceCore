@@ -73,7 +73,7 @@ public sealed class AddAttributeOptionIntegrationTests(
             item => item.Id == ProductTypeId.From(childResult.ProductTypeId),
             cancellationToken);
 
-        long childPreviousSchemaVersion = childBeforeOption.SchemaVersion;
+        long childPreviousSchemaVersion = childBeforeOption.OwnSchemaVersion;
 
         AddAttributeOptionCommandHandler addOptionHandler = new(
             dbContext,
@@ -100,10 +100,11 @@ public sealed class AddAttributeOptionIntegrationTests(
                 cancellationToken);
 
         Assert.NotEqual(Guid.Empty, optionResult.AttributeOptionId);
-        Assert.True(childAfterOption.SchemaVersion > childPreviousSchemaVersion);
         Assert.Equal(
-            childAfterOption.SchemaVersion,
-            childEffectiveSchema.SchemaVersion);
+            childPreviousSchemaVersion,
+            childAfterOption.OwnSchemaVersion);
+
+        Assert.True(childEffectiveSchema.EffectiveSchemaVersion > 0);
 
         using JsonDocument document = JsonDocument.Parse(childEffectiveSchema.Schema);
 

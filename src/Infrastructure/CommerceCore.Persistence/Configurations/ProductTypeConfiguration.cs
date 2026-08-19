@@ -49,8 +49,8 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
             .HasDefaultValue(false)
             .IsRequired();
 
-        builder.Property(productType => productType.SchemaVersion)
-            .HasColumnName("schema_version")
+        builder.Property(productType => productType.OwnSchemaVersion)
+            .HasColumnName("own_schema_version")
             .HasDefaultValue(0L)
             .IsRequired();
 

@@ -81,6 +81,11 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
 
                 await persistAsync(cancellationToken);
 
+                await IncrementOwnSchemaVersionAsync(
+                    affectedProductTypeId,
+                    transaction,
+                    cancellationToken);
+
                 long revision = await GetNextRevisionAsync(
                     transaction,
                     cancellationToken);
@@ -221,6 +226,36 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
         return productTypeIds;
     }
 
+    private async Task IncrementOwnSchemaVersionAsync(
+        ProductTypeId productTypeId,
+        IDbContextTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = CreateCommand(
+            transaction,
+            """
+            UPDATE catalog.product_types
+            SET own_schema_version = own_schema_version + 1
+            WHERE id = @product_type_id;
+            """);
+
+        command.Parameters.Add(
+            new NpgsqlParameter(
+                "product_type_id",
+                NpgsqlDbType.Uuid)
+            {
+                Value = productTypeId.Value
+            });
+
+        int affectedRows = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (affectedRows != 1)
+        {
+            throw new InvalidOperationException(
+                $"Product type '{productTypeId}' was not found.");
+        }
+    }
+
     private async Task<long> GetNextRevisionAsync(
         IDbContextTransaction transaction,
         CancellationToken cancellationToken)
@@ -246,13 +281,9 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
         await using NpgsqlCommand command = CreateCommand(
             transaction,
             """
-            UPDATE catalog.product_types
-            SET schema_version = @schema_revision
-            WHERE id = ANY(@product_type_ids);
-
             INSERT INTO catalog.product_type_effective_schema (
                 product_type_id,
-                schema_version,
+                effective_schema_version,
                 schema,
                 updated_at_utc)
             SELECT
@@ -337,7 +368,7 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
             WHERE target.id = ANY(@product_type_ids)
             ON CONFLICT (product_type_id)
             DO UPDATE SET
-                schema_version = EXCLUDED.schema_version,
+                effective_schema_version = EXCLUDED.effective_schema_version,
                 schema = EXCLUDED.schema,
                 updated_at_utc = EXCLUDED.updated_at_utc;
             """);
