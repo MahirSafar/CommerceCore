@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.AddAttributeOption;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
@@ -75,6 +75,12 @@ public sealed class AddAttributeOptionIntegrationTests(
 
         long childPreviousSchemaVersion = childBeforeOption.OwnSchemaVersion;
 
+        ProductTypeEffectiveSchema childEffectiveSchemaBefore = await dbContext
+            .Set<ProductTypeEffectiveSchema>()
+            .SingleAsync(
+                item => item.ProductTypeId == childBeforeOption.Id,
+                cancellationToken);
+
         AddAttributeOptionCommandHandler addOptionHandler = new(
             dbContext,
             schemaCoordinator);
@@ -105,6 +111,9 @@ public sealed class AddAttributeOptionIntegrationTests(
             childAfterOption.OwnSchemaVersion);
 
         Assert.True(childEffectiveSchema.EffectiveSchemaVersion > 0);
+        Assert.True(
+            childEffectiveSchema.EffectiveSchemaVersion >
+            childEffectiveSchemaBefore.EffectiveSchemaVersion);
 
         using JsonDocument document = JsonDocument.Parse(childEffectiveSchema.Schema);
 

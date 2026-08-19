@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
 using CommerceCore.Application.Common.Abstractions.Persistence;
@@ -60,6 +60,12 @@ public sealed class DefineAttributeIntegrationTests(
         long rootPreviousVersion = rootBeforeChange.OwnSchemaVersion;
         long childPreviousVersion = childBeforeChange.OwnSchemaVersion;
 
+        ProductTypeEffectiveSchema childEffectiveSchemaBefore = await dbContext
+            .Set<ProductTypeEffectiveSchema>()
+            .SingleAsync(
+                item => item.ProductTypeId == childBeforeChange.Id,
+                cancellationToken);
+
         DefineAttributeCommandHandler defineAttributeHandler = new(
             dbContext,
             schemaCoordinator);
@@ -107,6 +113,9 @@ public sealed class DefineAttributeIntegrationTests(
             childAfterChange.OwnSchemaVersion);
 
         Assert.True(childEffectiveSchema.EffectiveSchemaVersion > 0);
+        Assert.True(
+            childEffectiveSchema.EffectiveSchemaVersion >
+            childEffectiveSchemaBefore.EffectiveSchemaVersion);
 
         ProductTypeEffectiveSchema rootEffectiveSchema = await dbContext
             .Set<ProductTypeEffectiveSchema>()
