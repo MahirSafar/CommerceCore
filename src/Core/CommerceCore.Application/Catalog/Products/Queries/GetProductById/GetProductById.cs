@@ -7,6 +7,7 @@ public sealed record GetProductByIdQuery(Guid ProductId)
 
 public sealed record GetProductByIdResult(
     Guid ProductId,
+    Guid ProductTypeId,
     string DefaultLanguage,
     IReadOnlyDictionary<string, string> NameTranslations,
     decimal PriceAmount,

@@ -1,7 +1,8 @@
-﻿using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Events;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Events;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -17,7 +18,12 @@ public class ProductTests
 
     private static Money CreateValidPrice(decimal amount = 100) => Money.Create(amount, "USD");
 
-    private static Product CreateValidProduct() => Product.Create(CreateValidName(), CreateValidPrice(), TestTime);
+    private static Product CreateValidProduct() =>
+        Product.Create(
+            CreateValidName(),
+            CreateValidPrice(),
+            ProductTypeId.New(),
+            TestTime);
     
     [Fact]
     public void Archive_ShouldRaiseProductArchivedDomainEvent()
@@ -151,7 +157,11 @@ public class ProductTests
     [Fact]
     public void Activate_WithZeroPrice_ShouldThrowProductDomainException()
     {
-        Product product = Product.Create(CreateValidName(), CreateValidPrice(0), TestTime);
+        Product product = Product.Create(
+            CreateValidName(),
+            CreateValidPrice(0),
+            ProductTypeId.New(),
+            TestTime);
 
         ProductDomainException exception = Assert.Throws<ProductDomainException>(() => product.Activate());
         Assert.Equal("product.activation_requires_price", exception.Code);

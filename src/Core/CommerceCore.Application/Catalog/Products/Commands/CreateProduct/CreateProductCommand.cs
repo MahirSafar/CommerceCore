@@ -3,6 +3,7 @@
 namespace CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 
 public sealed record CreateProductCommand(
+    Guid ProductTypeId,
     string DefaultLanguage,
     IReadOnlyDictionary<string, string> NameTranslations,
     decimal PriceAmount,

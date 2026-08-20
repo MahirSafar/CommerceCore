@@ -32,6 +32,7 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
 
         Assert.NotNull(result);
         Assert.Equal(product.Id.Value, result.ProductId);
+        Assert.Equal(product.ProductTypeId.Value, result.ProductTypeId);
         Assert.Equal("az", result.DefaultLanguage);
         Assert.Equal("Sınaq məhsulu", result.NameTranslations["az"]);
         Assert.Equal("Test product", result.NameTranslations["en"]);
@@ -85,6 +86,7 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
         return Product.Create(
             name,
             Money.Create(149.99m, "USD"),
+            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(2026, 8, 15, 17, 0, 0, TimeSpan.Zero));
     }
 }

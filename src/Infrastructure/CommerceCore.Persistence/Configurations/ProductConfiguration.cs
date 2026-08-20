@@ -1,6 +1,10 @@
-﻿using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
+using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Persistence.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -11,8 +15,14 @@ namespace CommerceCore.Persistence.Configurations;
 
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private sealed record LocalizedTextDocument(string DefaultLanguage, Dictionary<string, string> Translations);
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web)
+        {
+            Converters =
+            {
+                new AttributeValueBagJsonConverter()
+            }
+        }; private sealed record LocalizedTextDocument(string DefaultLanguage, Dictionary<string, string> Translations);
     private static string SerializeLocalizedText(LocalizedText localizedText) => JsonSerializer.Serialize(new LocalizedTextDocument(localizedText.DefaultLanguage.Value, localizedText.Translations.ToDictionary(pair => pair.Key.Value, pair => pair.Value, StringComparer.Ordinal)));
     private static LocalizedText DeserializeLocalizedText(string json)
     {
@@ -24,11 +34,49 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
     private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left,right) => ReferenceEquals(left, right) || left!.Equals(right), value => value.GetHashCode(), value => value);
 
+    private static readonly ValueComparer<AttributeValueBag>
+    AttributeValueBagComparer = new(
+        (left, right) => left!.Equals(right),
+        value => value.GetHashCode(),
+        value => JsonSerializer.Deserialize<AttributeValueBag>(
+            JsonSerializer.Serialize(value, JsonOptions),
+            JsonOptions) ?? AttributeValueBag.Empty);
+
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.ToTable("products", schema: "catalog");
 
         builder.HasKey(product => product.Id);
+
+        builder.Property(product => product.ProductTypeId)
+            .HasColumnName("product_type_id")
+            .HasConversion(
+                id => id.Value,
+                value => ProductTypeId.From(value))
+            .IsRequired();
+
+        builder.Property(product => product.Specifications)
+            .HasColumnName("specifications")
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'{}'::jsonb")
+            .HasConversion(
+                bag => JsonSerializer.Serialize(bag, JsonOptions),
+                json => JsonSerializer.Deserialize<AttributeValueBag>(
+                    json,
+                    JsonOptions) ?? AttributeValueBag.Empty,
+                AttributeValueBagComparer)
+            .IsRequired();
+
+        builder.Property(product => product.ValidatedAgainstVersion)
+            .HasColumnName("validated_against_version")
+            .HasDefaultValue(0L)
+            .IsRequired();
+
+        builder.HasOne<ProductType>()
+            .WithMany()
+            .HasForeignKey(product => product.ProductTypeId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_products_product_type");
 
         builder.HasQueryFilter(product => !product.IsDeleted);
 
@@ -91,6 +139,10 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             product.Status,
             product.IsDeleted
         });
+
+        builder.HasIndex(product => product.ProductTypeId)
+            .HasFilter("\"is_deleted\" = FALSE")
+            .HasDatabaseName("ix_products_not_deleted_product_type_id");
 
         builder.OwnsOne(product => product.Price, price =>
         {

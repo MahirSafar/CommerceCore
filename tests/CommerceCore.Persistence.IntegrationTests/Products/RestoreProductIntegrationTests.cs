@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
+using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
@@ -66,6 +66,7 @@ public sealed class RestoreProductIntegrationTests(
         Product product = Product.Create(
             name,
             Money.Create(79.99m, "USD"),
+            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(2026, 8, 16, 10, 0, 0, TimeSpan.Zero));
 
         product.Activate();

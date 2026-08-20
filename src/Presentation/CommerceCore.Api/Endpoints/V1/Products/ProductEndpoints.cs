@@ -14,6 +14,7 @@ namespace CommerceCore.Api.Endpoints.V1.Products;
 public static class ProductEndpoints
 {
     public sealed record CreateProductRequest(
+        Guid ProductTypeId,
         string? DefaultLanguage,
         Dictionary<string, string>? NameTranslations,
         decimal PriceAmount,
@@ -34,6 +35,7 @@ public static class ProductEndpoints
                 CancellationToken cancellationToken) =>
             {
                 CreateProductCommand command = new(
+                    request.ProductTypeId,
                     request.DefaultLanguage ?? string.Empty,
                     request.NameTranslations ?? [],
                     request.PriceAmount,
@@ -75,6 +77,7 @@ public static class ProductEndpoints
                 return Results.Ok(
                     new GetProductResponse(
                         result.ProductId,
+                        result.ProductTypeId,
                         result.DefaultLanguage,
                         result.NameTranslations,
                         result.PriceAmount,
@@ -271,7 +274,14 @@ public static class ProductEndpoints
     public sealed record ProductPriceResponse(Guid ProductId, decimal PriceAmount, string Currency, string Status);
     public sealed record ChangeProductNameRequest(string? DefaultLanguage, Dictionary<string, string>? NameTranslations);
     public sealed record ProductNameResponse(Guid ProductId, string DefaultLanguage, IReadOnlyDictionary<string, string> NameTranslations, string Status);
-    public sealed record GetProductResponse(Guid ProductId, string DefaultLanguage, IReadOnlyDictionary<string, string> NameTranslations, decimal PriceAmount, string Currency, string Status);
+    public sealed record GetProductResponse(
+        Guid ProductId,
+        Guid ProductTypeId,
+        string DefaultLanguage,
+        IReadOnlyDictionary<string, string> NameTranslations,
+        decimal PriceAmount,
+        string Currency,
+        string Status);
 
     private static IResult ProductNotFound() => Results.Problem(
             statusCode: StatusCodes.Status404NotFound,
