@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
+using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -80,6 +80,7 @@ public sealed class ChangeProductNameIntegrationTests(
         return Product.Create(
             name,
             Money.Create(100m, "USD"),
+            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(2026, 8, 16, 9, 0, 0, TimeSpan.Zero));
     }
 }

@@ -1,7 +1,9 @@
-﻿using CommerceCore.Domain.Catalog.Products.Enums;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Events;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -16,6 +18,12 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
     public Money Price { get; private set; } = null!;
 
+    public ProductTypeId ProductTypeId { get; private set; }
+
+    public AttributeValueBag Specifications { get; private set; } = AttributeValueBag.Empty;
+
+    public long ValidatedAgainstVersion { get; private set; }
+
     public ProductStatus Status { get; private set; }
 
     private Product()
@@ -25,28 +33,48 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
     private Product(
         ProductId id,
         LocalizedText name,
-        Money price)
+        Money price,
+        ProductTypeId productTypeId)
         : base(id)
     {
+        if (productTypeId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Product type ID cannot be empty.",
+                nameof(productTypeId));
+        }
+
         Name = name;
         Price = price;
+        ProductTypeId = productTypeId;
+        Specifications = AttributeValueBag.Empty;
+        ValidatedAgainstVersion = 0;
         Status = ProductStatus.Draft;
     }
 
     public static Product Create(
-        LocalizedText name,
-        Money price,
-        DateTimeOffset createdAtUtc)
-    {
+      LocalizedText name,
+      Money price,
+      ProductTypeId productTypeId,
+      DateTimeOffset createdAtUtc)
+    { 
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(price);
 
+        if (createdAtUtc == default)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(createdAtUtc),
+                "Created-at timestamp cannot be empty.");
+        }
+
         EnsureValidName(name);
 
-        var product = new Product(
+        Product product = new Product(
             ProductId.New(),
             name,
-            price);
+            price,
+            productTypeId);
 
         product.RaiseDomainEvent(
             new ProductCreatedDomainEvent(
@@ -149,6 +177,32 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
         if (Status == ProductStatus.Active)
             Status = ProductStatus.Inactive;
+
+        return true;
+    }
+
+    public bool ApplyValidatedSpecifications(
+    AttributeValueBag specifications,
+    long effectiveSchemaVersion)
+    {
+        EnsureNotArchived();
+        ArgumentNullException.ThrowIfNull(specifications);
+
+        if (effectiveSchemaVersion <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(effectiveSchemaVersion),
+                "The effective schema version must be positive.");
+        }
+
+        if (Specifications.Equals(specifications) &&
+            ValidatedAgainstVersion == effectiveSchemaVersion)
+        {
+            return false;
+        }
+
+        Specifications = specifications;
+        ValidatedAgainstVersion = effectiveSchemaVersion;
 
         return true;
     }

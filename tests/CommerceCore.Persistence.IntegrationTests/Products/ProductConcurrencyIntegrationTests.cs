@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -18,31 +18,31 @@ public sealed class ProductConcurrencyIntegrationTests(
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         Guid productId = await SeedProductAsync(cancellationToken);
 
-        await using var firstScope = fixture.Services.CreateAsyncScope();
-        await using var secondScope = fixture.Services.CreateAsyncScope();
-
-        CommerceCoreDbContext firstDbContext = firstScope.ServiceProvider
+        await using var scope1 = fixture.Services.CreateAsyncScope();
+        CommerceCoreDbContext dbContext1 = scope1.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        CommerceCoreDbContext secondDbContext = secondScope.ServiceProvider
+        await using var scope2 = fixture.Services.CreateAsyncScope();
+        CommerceCoreDbContext dbContext2 = scope2.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        ProductId typedProductId = ProductId.From(productId);
+        Product product1 = await dbContext1.Products
+            .SingleAsync(
+                item => item.Id == ProductId.From(productId),
+                cancellationToken);
 
-        Product firstProduct = await firstDbContext.Products
-            .SingleAsync(product => product.Id == typedProductId, cancellationToken);
+        Product product2 = await dbContext2.Products
+            .SingleAsync(
+                item => item.Id == ProductId.From(productId),
+                cancellationToken);
 
-        Product secondProduct = await secondDbContext.Products
-            .SingleAsync(product => product.Id == typedProductId, cancellationToken);
+        product1.ChangePrice(Money.Create(120m, "USD"));
+        product2.ChangePrice(Money.Create(130m, "USD"));
 
-        Assert.True(firstProduct.Activate());
-        Assert.True(secondProduct.Activate());
-
-        await firstDbContext.SaveChangesAsync(cancellationToken);
+        await dbContext1.SaveChangesAsync(cancellationToken);
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
-            async () => await secondDbContext.SaveChangesAsync(
-                cancellationToken));
+            () => dbContext2.SaveChangesAsync(cancellationToken));
     }
 
     private async Task<Guid> SeedProductAsync(
@@ -66,6 +66,7 @@ public sealed class ProductConcurrencyIntegrationTests(
         Product product = Product.Create(
             name,
             Money.Create(99.99m, "USD"),
+            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(2026, 8, 15, 20, 0, 0, TimeSpan.Zero));
 
         dbContext.Products.Add(product);

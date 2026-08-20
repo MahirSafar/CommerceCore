@@ -31,5 +31,9 @@ public sealed class CreateProductCommandValidator
                     context,
                     nameof(command.NameTranslations),
                     Product.MaximumNameLength));
+
+        RuleFor(command => command.ProductTypeId)
+            .NotEqual(Guid.Empty)
+            .WithMessage("Product type ID cannot be empty.");
     }
 }

@@ -28,6 +28,7 @@ public sealed class GetProductByIdQueryHandler(
 
         return new GetProductByIdResult(
             product.Id.Value,
+            product.ProductTypeId.Value,
             product.Name.DefaultLanguage.Value,
             product.Name.Translations.ToDictionary(
                 translation => translation.Key.Value,

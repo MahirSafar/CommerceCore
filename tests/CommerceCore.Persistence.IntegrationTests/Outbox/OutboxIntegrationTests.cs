@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Events;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -37,6 +37,7 @@ public sealed class OutboxIntegrationTests(
         var product = Product.Create(
             name,
             Money.Create(99.99m, "USD"),
+            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(
                 2026, 8, 15, 15, 0, 0, TimeSpan.Zero));
 
