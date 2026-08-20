@@ -26,4 +26,8 @@ public sealed record EffectiveAttributeDefinition(
     decimal? MinimumValue,
     decimal? MaximumValue,
     MeasurementUnitFamily? MeasurementUnitFamily,
-    IReadOnlySet<AttributeOptionCode> AllowedOptionCodes);
+    IReadOnlyList<EffectiveAttributeOption> Options);
+
+public sealed record EffectiveAttributeOption(
+    AttributeOptionCode Code,
+    bool IsDeprecated);
