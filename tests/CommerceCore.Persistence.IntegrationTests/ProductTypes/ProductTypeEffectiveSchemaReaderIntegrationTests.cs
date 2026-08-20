@@ -1,5 +1,6 @@
 ﻿using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
+using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
