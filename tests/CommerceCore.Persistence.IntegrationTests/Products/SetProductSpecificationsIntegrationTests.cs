@@ -1,0 +1,224 @@
+﻿using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
+using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.ProductTypes.Schema;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Domain.Common.ValueObjects;
+using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace CommerceCore.Persistence.IntegrationTests.Products;
+
+[Collection(nameof(PostgreSqlCollection))]
+public sealed class SetProductSpecificationsIntegrationTests(
+    PostgreSqlFixture fixture)
+{
+    [Fact]
+    public async Task Handle_WithValidSpecifications_PersistsJsonbAndSchemaVersion()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        IProductTypeEffectiveSchemaReader schemaReader =
+            scope.ServiceProvider.GetRequiredService<
+                IProductTypeEffectiveSchemaReader>();
+
+        ICatalogSchemaValidator schemaValidator =
+            scope.ServiceProvider.GetRequiredService<
+                ICatalogSchemaValidator>();
+
+        SetProductSpecificationsCommandHandler handler = new(
+            dbContext,
+            schemaReader,
+            schemaValidator);
+
+        AttributeValueBag specifications = AttributeValueBag.Empty.With(
+            AttributeKey.Create("ram_gb"),
+            AttributeValue.Integer.Create(16));
+
+        SetProductSpecificationsResult result = await handler.Handle(
+            new SetProductSpecificationsCommand(
+                product.Id.Value,
+                specifications),
+            cancellationToken);
+
+        Assert.True(result.Changed);
+        Assert.Equal(product.Id.Value, result.ProductId);
+        Assert.Equal(42, result.ValidatedAgainstVersion);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products.SingleAsync(
+            item => item.Id == product.Id,
+            cancellationToken);
+
+        Assert.Equal(42, persistedProduct.ValidatedAgainstVersion);
+
+        Assert.True(
+            persistedProduct.Specifications.TryGetValue(
+                AttributeKey.Create("ram_gb"),
+                out AttributeValue? value));
+
+        AttributeValue.Integer ram = Assert.IsType<AttributeValue.Integer>(
+            value);
+
+        Assert.Equal(16, ram.Value);
+    }
+
+    [Fact]
+    public async Task Handle_WithInvalidSpecifications_ThrowsValidationException()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        IProductTypeEffectiveSchemaReader schemaReader =
+            scope.ServiceProvider.GetRequiredService<
+                IProductTypeEffectiveSchemaReader>();
+
+        ICatalogSchemaValidator schemaValidator =
+            scope.ServiceProvider.GetRequiredService<
+                ICatalogSchemaValidator>();
+
+        SetProductSpecificationsCommandHandler handler = new(
+            dbContext,
+            schemaReader,
+            schemaValidator);
+
+        ValidationException exception = await Assert.ThrowsAsync<
+            ValidationException>(() => handler.Handle(
+                new SetProductSpecificationsCommand(
+                    product.Id.Value,
+                    AttributeValueBag.Empty.With(
+                        AttributeKey.Create("ram_gb"),
+                        AttributeValue.Text.Create("sixteen"))),
+                cancellationToken).AsTask());
+
+        Assert.Contains(
+            exception.Errors,
+            error => error.ErrorCode ==
+                "catalog_schema.attribute_type_mismatch");
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products.SingleAsync(
+            item => item.Id == product.Id,
+            cancellationToken);
+
+        Assert.Empty(persistedProduct.Specifications.Values);
+        Assert.Equal(0, persistedProduct.ValidatedAgainstVersion);
+    }
+
+    private static async Task<Product> SeedProductAsync(
+        CommerceCoreDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        Guid productTypeId = Guid.NewGuid();
+
+        string productTypeCode = $"spec_test_{Guid.NewGuid():N}";
+
+        string schemaJson =
+            """
+            {
+              "attributes": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000001",
+                  "key": "ram_gb",
+                  "scope": "ProductSpecification",
+                  "options": [],
+                  "dataType": "Integer",
+                  "isRequired": false,
+                  "displayOrder": 0,
+                  "isDeprecated": false,
+                  "maximumValue": 256,
+                  "minimumValue": 4,
+                  "maximumLength": null,
+                  "minimumLength": null,
+                  "enforcementStatus": "Enforced",
+                  "measurementUnitFamily": null
+                }
+              ]
+            }
+            """;
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO catalog.product_types (
+                id,
+                code,
+                is_assignable,
+                own_schema_version,
+                created_at_utc,
+                created_by)
+            VALUES (
+                {productTypeId},
+                {productTypeCode},
+                TRUE,
+                0,
+                CURRENT_TIMESTAMP,
+                'integration-test');
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO catalog.product_type_effective_schema (
+                product_type_id,
+                effective_schema_version,
+                schema,
+                updated_at_utc)
+            VALUES (
+                {productTypeId},
+                42,
+                CAST({schemaJson} AS jsonb),
+                CURRENT_TIMESTAMP);
+            """,
+            cancellationToken);
+
+        LanguageCode language = LanguageCode.Create("en");
+
+        LocalizedText name = LocalizedText.Create(
+            language,
+            [
+                new KeyValuePair<LanguageCode, string>(
+                    language,
+                    "Specification test product")
+            ]);
+
+        Product product = Product.Create(
+            name,
+            Money.Create(100m, "USD"),
+            ProductTypeId.From(productTypeId),
+            new DateTimeOffset(
+                2026, 8, 21, 10, 0, 0, TimeSpan.Zero));
+
+        dbContext.Products.Add(product);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return product;
+    }
+}
