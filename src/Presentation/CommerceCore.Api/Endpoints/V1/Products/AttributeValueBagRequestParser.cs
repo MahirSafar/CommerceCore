@@ -6,7 +6,7 @@ using FluentValidation.Results;
 
 namespace CommerceCore.Api.Endpoints.V1.Products;
 
-internal static class AttributeValueBagRequestParser
+public static class AttributeValueBagRequestParser
 {
     public static AttributeValueBag Parse(JsonElement specifications)
     {
