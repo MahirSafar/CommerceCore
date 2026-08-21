@@ -1,4 +1,5 @@
-﻿using CommerceCore.Application.Common.Abstractions;
+﻿using CommerceCore.Application;
+using CommerceCore.Application.Common.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
@@ -25,6 +26,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         services.AddSingleton<ICurrentUser, TestCurrentUser>();
 
         services.AddPersistence(_postgres.GetConnectionString());
+        
+        services.AddApplication();
 
         Services = services.BuildServiceProvider();
 
