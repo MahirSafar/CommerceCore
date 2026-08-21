@@ -83,7 +83,10 @@ public static class ProductEndpoints
                         result.NameTranslations,
                         result.PriceAmount,
                         result.Currency,
-                        result.Status));
+                        result.Status,
+                        AttributeValueBagResponseSerializer.Serialize(
+                            result.Specifications),
+                        result.ValidatedAgainstVersion));
             })
         .WithName("GetProductById")
         .Produces<GetProductResponse>(StatusCodes.Status200OK)
@@ -319,7 +322,9 @@ public static class ProductEndpoints
         IReadOnlyDictionary<string, string> NameTranslations,
         decimal PriceAmount,
         string Currency,
-        string Status);
+        string Status,
+        JsonElement Specifications,
+        long ValidatedAgainstVersion);
 
     private static IResult ProductNotFound() => Results.Problem(
             statusCode: StatusCodes.Status404NotFound,
