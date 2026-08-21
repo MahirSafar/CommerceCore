@@ -1,13 +1,14 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using Mediator;
-using static CommerceCore.Api.Endpoints.V1.Products.ProductEndpoints;
+using System.Text.Json;
 
 namespace CommerceCore.Api.Endpoints.V1.Products;
 
@@ -264,8 +265,45 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
+        group.MapPut(
+            "{productId:guid}/specifications",
+            async (
+                Guid productId,
+                SetProductSpecificationsRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                var specifications = AttributeValueBagRequestParser.Parse(
+                    request.Specifications);
+
+                SetProductSpecificationsResult result = await mediator.Send(
+                    new SetProductSpecificationsCommand(
+                        productId,
+                        specifications),
+                    cancellationToken);
+
+                return Results.Ok(
+                    new SetProductSpecificationsResponse(
+                        result.ProductId,
+                        result.ValidatedAgainstVersion,
+                        result.Changed));
+            })
+        .WithName("SetProductSpecifications")
+        .Produces<SetProductSpecificationsResponse>(StatusCodes.Status200OK)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
         return endpoints;
     }
+    public sealed record SetProductSpecificationsRequest(
+        JsonElement Specifications);
+
+    public sealed record SetProductSpecificationsResponse(
+        Guid ProductId,
+        long ValidatedAgainstVersion,
+        bool Changed);
     public sealed record ActivateProductResponse(Guid ProductId, string Status);
     public sealed record DeactivateProductResponse(Guid ProductId, string Status);
     public sealed record ArchiveProductResponse(Guid ProductId, DateTimeOffset ArchivedAtUtc);
