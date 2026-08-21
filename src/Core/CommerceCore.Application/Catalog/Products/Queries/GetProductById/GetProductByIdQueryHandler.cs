@@ -36,6 +36,8 @@ public sealed class GetProductByIdQueryHandler(
                 StringComparer.Ordinal),
             product.Price.Amount,
             product.Price.Currency,
-            product.Status.ToString());
+            product.Status.ToString(),
+            product.Specifications,
+            product.ValidatedAgainstVersion);
     }
 }

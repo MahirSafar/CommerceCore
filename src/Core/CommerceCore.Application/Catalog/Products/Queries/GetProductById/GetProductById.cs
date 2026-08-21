@@ -1,4 +1,5 @@
-﻿using Mediator;
+﻿using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using Mediator;
 
 namespace CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 
@@ -12,4 +13,6 @@ public sealed record GetProductByIdResult(
     IReadOnlyDictionary<string, string> NameTranslations,
     decimal PriceAmount,
     string Currency,
-    string Status);
+    string Status,
+    AttributeValueBag Specifications,
+    long ValidatedAgainstVersion);
