@@ -80,6 +80,135 @@ public sealed class SetProductSpecificationsIntegrationTests(
     }
 
     [Fact]
+    public async Task Handle_WithMassMeasurement_NormalizesAndPersistsCanonicalValue()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken,
+            CreateMassMeasurementSchemaJson());
+
+        IProductTypeEffectiveSchemaReader schemaReader =
+            scope.ServiceProvider.GetRequiredService<
+                IProductTypeEffectiveSchemaReader>();
+
+        ICatalogSchemaValidator schemaValidator =
+            scope.ServiceProvider.GetRequiredService<
+                ICatalogSchemaValidator>();
+
+        SetProductSpecificationsCommandHandler handler = new(
+            dbContext,
+            schemaReader,
+            schemaValidator);
+
+        ProductSpecificationsInput specifications = new(
+            new Dictionary<AttributeKey, ProductSpecificationInputValue>
+            {
+                [AttributeKey.Create("weight")] =
+                    new ProductSpecificationInputValue.Measurement(
+                        1.5m,
+                        "kg")
+            });
+
+        SetProductSpecificationsResult result = await handler.Handle(
+            new SetProductSpecificationsCommand(
+                product.Id.Value,
+                specifications),
+            cancellationToken);
+
+        Assert.True(result.Changed);
+        Assert.Equal(42, result.ValidatedAgainstVersion);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products.SingleAsync(
+            item => item.Id == product.Id,
+            cancellationToken);
+
+        Assert.True(
+            persistedProduct.Specifications.TryGetValue(
+                AttributeKey.Create("weight"),
+                out AttributeValue? value));
+
+        AttributeValue.Measurement weight = Assert.IsType<
+            AttributeValue.Measurement>(value);
+
+        Assert.Equal(1.5m, weight.Value);
+        Assert.Equal("kg", weight.Unit);
+        Assert.Equal(1500m, weight.CanonicalValue);
+        Assert.Equal("g", weight.CanonicalUnit);
+    }
+
+    [Fact]
+    public async Task Handle_WithUnitOutsideSchemaFamily_ThrowsValidationException()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken,
+            CreateMassMeasurementSchemaJson());
+
+        IProductTypeEffectiveSchemaReader schemaReader =
+            scope.ServiceProvider.GetRequiredService<
+                IProductTypeEffectiveSchemaReader>();
+
+        ICatalogSchemaValidator schemaValidator =
+            scope.ServiceProvider.GetRequiredService<
+                ICatalogSchemaValidator>();
+
+        SetProductSpecificationsCommandHandler handler = new(
+            dbContext,
+            schemaReader,
+            schemaValidator);
+
+        ProductSpecificationsInput specifications = new(
+            new Dictionary<AttributeKey, ProductSpecificationInputValue>
+            {
+                [AttributeKey.Create("weight")] =
+                    new ProductSpecificationInputValue.Measurement(
+                        15m,
+                        "cm")
+            });
+
+        ValidationException exception = await Assert.ThrowsAsync<
+            ValidationException>(() => handler.Handle(
+                new SetProductSpecificationsCommand(
+                    product.Id.Value,
+                    specifications),
+                cancellationToken).AsTask());
+
+        Assert.Contains(
+            exception.Errors,
+            error => error.ErrorCode ==
+                "catalog_schema.measurement_unit_not_supported");
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products.SingleAsync(
+            item => item.Id == product.Id,
+            cancellationToken);
+
+        Assert.Empty(persistedProduct.Specifications.Values);
+        Assert.Equal(0, persistedProduct.ValidatedAgainstVersion);
+    }
+
+    [Fact]
     public async Task Handle_WithInvalidSpecifications_ThrowsValidationException()
     {
         CancellationToken cancellationToken =
@@ -132,37 +261,62 @@ public sealed class SetProductSpecificationsIntegrationTests(
         Assert.Equal(0, persistedProduct.ValidatedAgainstVersion);
     }
 
+    private static string CreateMassMeasurementSchemaJson() =>
+    """
+    {
+      "attributes": [
+        {
+          "id": "00000000-0000-0000-0000-000000000002",
+          "key": "weight",
+          "scope": "ProductSpecification",
+          "options": [],
+          "dataType": "Measurement",
+          "isRequired": false,
+          "displayOrder": 0,
+          "isDeprecated": false,
+          "maximumValue": 10000,
+          "minimumValue": 100,
+          "maximumLength": null,
+          "minimumLength": null,
+          "enforcementStatus": "Enforced",
+          "measurementUnitFamily": "mass"
+        }
+      ]
+    }
+    """;
+
     private static async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? schemaJson = null)
     {
         Guid productTypeId = Guid.NewGuid();
 
         string productTypeCode = $"spec_test_{Guid.NewGuid():N}";
 
-        string schemaJson =
-            """
+        schemaJson ??=
+         """
+        {
+          "attributes": [
             {
-              "attributes": [
-                {
-                  "id": "00000000-0000-0000-0000-000000000001",
-                  "key": "ram_gb",
-                  "scope": "ProductSpecification",
-                  "options": [],
-                  "dataType": "Integer",
-                  "isRequired": false,
-                  "displayOrder": 0,
-                  "isDeprecated": false,
-                  "maximumValue": 256,
-                  "minimumValue": 4,
-                  "maximumLength": null,
-                  "minimumLength": null,
-                  "enforcementStatus": "Enforced",
-                  "measurementUnitFamily": null
-                }
-              ]
+              "id": "00000000-0000-0000-0000-000000000001",
+              "key": "ram_gb",
+              "scope": "ProductSpecification",
+              "options": [],
+              "dataType": "Integer",
+              "isRequired": false,
+              "displayOrder": 0,
+              "isDeprecated": false,
+              "maximumValue": 256,
+              "minimumValue": 4,
+              "maximumLength": null,
+              "minimumLength": null,
+              "enforcementStatus": "Enforced",
+              "measurementUnitFamily": null
             }
-            """;
+          ]
+        }
+        """;
 
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"""
