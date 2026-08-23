@@ -1,14 +1,15 @@
-﻿using System.Text.Json;
+﻿using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using FluentValidation;
 using FluentValidation.Results;
+using System.Text.Json;
 
 namespace CommerceCore.Api.Endpoints.V1.Products;
 
 public static class AttributeValueBagRequestParser
 {
-    public static AttributeValueBag Parse(JsonElement specifications)
+    public static ProductSpecificationsInput Parse(JsonElement specifications)
     {
         List<ValidationFailure> failures = [];
 
@@ -30,7 +31,7 @@ public static class AttributeValueBagRequestParser
                 "A product can contain at most 50 specification attributes."));
         }
 
-        AttributeValueBag result = AttributeValueBag.Empty;
+        Dictionary<AttributeKey, ProductSpecificationInputValue> result = [];
         HashSet<AttributeKey> keys = [];
 
         foreach (JsonProperty property in properties)
@@ -60,18 +61,18 @@ public static class AttributeValueBagRequestParser
                     property.Value,
                     propertyPath,
                     failures,
-                    out AttributeValue? value))
+                    out ProductSpecificationInputValue? value))
             {
                 continue;
             }
 
-            result = result.With(key, value!);
+            result.Add(key, value!);
         }
 
         if (failures.Count > 0)
             throw new ValidationException(failures);
 
-        return result;
+        return new ProductSpecificationsInput(result);
     }
 
     private static bool TryCreateKey(
@@ -102,7 +103,7 @@ public static class AttributeValueBagRequestParser
         JsonElement element,
         string propertyPath,
         List<ValidationFailure> failures,
-        out AttributeValue? value)
+        out ProductSpecificationInputValue? value)
     {
         value = null;
 
@@ -140,28 +141,33 @@ public static class AttributeValueBagRequestParser
         {
             value = tag switch
             {
-                "text" => ParseText(rawValue),
-                "integer" => ParseInteger(rawValue),
-                "decimal" => ParseDecimal(rawValue),
-                "boolean" => ParseBoolean(rawValue),
-                "singleSelect" => ParseSingleSelect(rawValue),
-                "multiSelect" => ParseMultiSelect(rawValue),
-                "measurement" => throw new NotSupportedException(),
-                _ => throw new ArgumentException()
+                "text" => new ProductSpecificationInputValue.Typed(
+                    ParseText(rawValue)),
+
+                "integer" => new ProductSpecificationInputValue.Typed(
+                    ParseInteger(rawValue)),
+
+                "decimal" => new ProductSpecificationInputValue.Typed(
+                    ParseDecimal(rawValue)),
+
+                "boolean" => new ProductSpecificationInputValue.Typed(
+                    ParseBoolean(rawValue)),
+
+                "singleSelect" => new ProductSpecificationInputValue.Typed(
+                    ParseSingleSelect(rawValue)),
+
+                "multiSelect" => new ProductSpecificationInputValue.Typed(
+                    ParseMultiSelect(rawValue)),
+
+                "measurement" => ParseMeasurement(rawValue),
+
+                _ => throw InvalidValueFormat()
             };
 
             return true;
         }
-        catch (NotSupportedException)
-        {
-            failures.Add(CreateFailure(
-                propertyPath,
-                "specifications.measurement_requires_normalization",
-                "Measurement values require server-side unit normalization and are not available yet."));
-
-            return false;
-        }
-        catch (ArgumentException)
+        catch (Exception exception) when (
+            exception is ArgumentException or FormatException)
         {
             failures.Add(CreateFailure(
                 propertyPath,
@@ -175,7 +181,7 @@ public static class AttributeValueBagRequestParser
     private static AttributeValue.Text ParseText(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String)
-            throw new ArgumentException();
+            throw InvalidValueFormat();
 
         return AttributeValue.Text.Create(value.GetString()!);
     }
@@ -185,7 +191,7 @@ public static class AttributeValueBagRequestParser
         if (value.ValueKind != JsonValueKind.Number ||
             !value.TryGetInt64(out long integer))
         {
-            throw new ArgumentException();
+            throw InvalidValueFormat();
         }
 
         return AttributeValue.Integer.Create(integer);
@@ -196,7 +202,7 @@ public static class AttributeValueBagRequestParser
         if (value.ValueKind != JsonValueKind.Number ||
             !value.TryGetDecimal(out decimal decimalValue))
         {
-            throw new ArgumentException();
+            throw InvalidValueFormat();
         }
 
         return AttributeValue.Decimal.Create(decimalValue);
@@ -207,7 +213,7 @@ public static class AttributeValueBagRequestParser
         if (value.ValueKind is not JsonValueKind.True
             and not JsonValueKind.False)
         {
-            throw new ArgumentException();
+            throw InvalidValueFormat();
         }
 
         return AttributeValue.Boolean.Create(value.GetBoolean());
@@ -217,7 +223,7 @@ public static class AttributeValueBagRequestParser
         JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String)
-            throw new ArgumentException();
+            throw InvalidValueFormat();
 
         return AttributeValue.SingleSelect.Create(value.GetString()!);
     }
@@ -226,19 +232,49 @@ public static class AttributeValueBagRequestParser
         JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.Array)
-            throw new ArgumentException();
+            throw InvalidValueFormat();
 
         List<string> optionCodes = [];
 
         foreach (JsonElement item in value.EnumerateArray())
         {
             if (item.ValueKind != JsonValueKind.String)
-                throw new ArgumentException();
+                throw InvalidValueFormat();
 
             optionCodes.Add(item.GetString()!);
         }
 
         return AttributeValue.MultiSelect.Create(optionCodes);
+    }
+
+    private static ProductSpecificationInputValue.Measurement ParseMeasurement(
+    JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+            throw InvalidValueFormat();
+
+        JsonProperty[] properties = [.. value.EnumerateObject()];
+
+        if (properties.Length != 2 ||
+            !value.TryGetProperty("value", out JsonElement rawAmount) ||
+            !value.TryGetProperty("unit", out JsonElement rawUnit) ||
+            rawAmount.ValueKind != JsonValueKind.Number ||
+            !rawAmount.TryGetDecimal(out decimal amount) ||
+            rawUnit.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(rawUnit.GetString()))
+        {
+            throw InvalidValueFormat();
+        }
+
+        foreach (JsonProperty property in properties)
+        {
+            if (property.Name is not "value" and not "unit")
+                throw InvalidValueFormat();
+        }
+
+        return new ProductSpecificationInputValue.Measurement(
+            amount,
+            rawUnit.GetString()!);
     }
 
     private static bool TryGetString(
@@ -266,10 +302,13 @@ public static class AttributeValueBagRequestParser
         return true;
     }
 
+    private static FormatException InvalidValueFormat() =>
+        new("The tagged specification value has an invalid JSON format.");
+
     private static ValidationException CreateException(
         string propertyName,
         string errorCode,
-        string message) => new ValidationException(
+        string message) => new(
         [
             CreateFailure(propertyName, errorCode, message)
         ]);
@@ -277,7 +316,7 @@ public static class AttributeValueBagRequestParser
     private static ValidationFailure CreateFailure(
         string propertyName,
         string errorCode,
-        string message) => new ValidationFailure(propertyName, message)
+        string message) => new(propertyName, message)
         {
             ErrorCode = errorCode
         };

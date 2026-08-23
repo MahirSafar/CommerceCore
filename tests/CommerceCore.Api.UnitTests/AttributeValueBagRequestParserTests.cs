@@ -1,15 +1,16 @@
-﻿using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
-using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+﻿using System.Text.Json;
 using CommerceCore.Api.Endpoints.V1.Products;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using FluentValidation;
-using System.Text.Json;
 
 namespace CommerceCore.Api.UnitTests;
 
 public sealed class AttributeValueBagRequestParserTests
 {
     [Fact]
-    public void Parse_WithValidTaggedValues_CreatesTypedBag()
+    public void Parse_WithValidTaggedValues_CreatesTypedInput()
     {
         using JsonDocument document = JsonDocument.Parse(
             """
@@ -26,40 +27,67 @@ public sealed class AttributeValueBagRequestParserTests
             }
             """);
 
-        AttributeValueBag result = AttributeValueBagRequestParser.Parse(
-            document.RootElement);
+        ProductSpecificationsInput result =
+            AttributeValueBagRequestParser.Parse(document.RootElement);
 
         Assert.Equal(6, result.Count);
 
         Assert.Equal(
             "Gaming laptop",
             Assert.IsType<AttributeValue.Text>(
-                result.Values[AttributeKey.Create("title")]).Value);
+                GetTypedValue(result, "title")).Value);
 
         Assert.Equal(
-            16,
+            16L,
             Assert.IsType<AttributeValue.Integer>(
-                result.Values[AttributeKey.Create("ram_gb")]).Value);
+                GetTypedValue(result, "ram_gb")).Value);
 
         Assert.Equal(
             15.6m,
             Assert.IsType<AttributeValue.Decimal>(
-                result.Values[AttributeKey.Create("screen_size")]).Value);
+                GetTypedValue(result, "screen_size")).Value);
 
         Assert.True(
             Assert.IsType<AttributeValue.Boolean>(
-                result.Values[AttributeKey.Create("touch")]).Value);
+                GetTypedValue(result, "touch")).Value);
 
         Assert.Equal(
             "space-black",
             Assert.IsType<AttributeValue.SingleSelect>(
-                result.Values[AttributeKey.Create("finish")]).OptionCode);
+                GetTypedValue(result, "finish")).OptionCode);
 
         AttributeValue.MultiSelect ports = Assert.IsType<
             AttributeValue.MultiSelect>(
-            result.Values[AttributeKey.Create("ports")]);
+            GetTypedValue(result, "ports"));
 
         Assert.Equal(["hdmi", "usb-c"], ports.OptionCodes);
+    }
+
+    [Fact]
+    public void Parse_WithRawMeasurement_CreatesMeasurementInput()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            """
+            {
+              "weight": {
+                "t": "measurement",
+                "v": {
+                  "value": 1.5,
+                  "unit": "kg"
+                }
+              }
+            }
+            """);
+
+        ProductSpecificationsInput result =
+            AttributeValueBagRequestParser.Parse(document.RootElement);
+
+        ProductSpecificationInputValue.Measurement measurement =
+            Assert.IsType<ProductSpecificationInputValue.Measurement>(
+                result.Values[AttributeKey.Create("weight")]);
+
+        Assert.Equal(1.5m, measurement.Value);
+        Assert.Equal("kg", measurement.Unit);
     }
 
     [Fact]
@@ -74,8 +102,7 @@ public sealed class AttributeValueBagRequestParserTests
 
         ValidationException exception = Assert.Throws<
             ValidationException>(() =>
-                AttributeValueBagRequestParser.Parse(
-                    document.RootElement));
+                AttributeValueBagRequestParser.Parse(document.RootElement));
 
         Assert.Contains(
             exception.Errors,
@@ -84,7 +111,7 @@ public sealed class AttributeValueBagRequestParserTests
     }
 
     [Fact]
-    public void Parse_WithMeasurement_RejectsClientCanonicalValue()
+    public void Parse_WithMeasurementCanonicalFields_ThrowsValidationException()
     {
         using JsonDocument document = JsonDocument.Parse(
             """
@@ -94,7 +121,7 @@ public sealed class AttributeValueBagRequestParserTests
                 "v": {
                   "value": 1,
                   "unit": "kg",
-                  "canonicalValue": 1,
+                  "canonicalValue": 1000,
                   "canonicalUnit": "g"
                 }
               }
@@ -103,12 +130,22 @@ public sealed class AttributeValueBagRequestParserTests
 
         ValidationException exception = Assert.Throws<
             ValidationException>(() =>
-                AttributeValueBagRequestParser.Parse(
-                    document.RootElement));
+                AttributeValueBagRequestParser.Parse(document.RootElement));
 
         Assert.Contains(
             exception.Errors,
             error => error.ErrorCode ==
-                "specifications.measurement_requires_normalization");
+                "specifications.invalid_value");
+    }
+
+    private static AttributeValue GetTypedValue(
+        ProductSpecificationsInput input,
+        string key)
+    {
+        ProductSpecificationInputValue.Typed typed = Assert.IsType<
+            ProductSpecificationInputValue.Typed>(
+            input.Values[AttributeKey.Create(key)]);
+
+        return typed.Value;
     }
 }
