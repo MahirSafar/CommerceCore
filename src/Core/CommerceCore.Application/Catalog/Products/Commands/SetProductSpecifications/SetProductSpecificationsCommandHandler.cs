@@ -1,4 +1,5 @@
 ﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
@@ -45,10 +46,13 @@ public sealed class SetProductSpecificationsCommandHandler(
                 "product.effective_schema_not_found",
                 $"Effective schema for product type '{product.ProductTypeId}' was not found.");
 
+        AttributeValueBag proposedSpecifications =
+            command.Specifications.ToTypedBag();
+
         CatalogSchemaValidationResult validationResult =
             _schemaValidator.ValidateProductSpecifications(
                 product.Specifications,
-                command.Specifications,
+                proposedSpecifications,
                 schema);
 
         if (!validationResult.IsValid)
@@ -65,7 +69,7 @@ public sealed class SetProductSpecificationsCommandHandler(
         }
 
         bool changed = product.ApplyValidatedSpecifications(
-            command.Specifications,
+            proposedSpecifications,
             schema.EffectiveSchemaVersion);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
