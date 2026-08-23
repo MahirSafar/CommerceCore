@@ -5,8 +5,18 @@ namespace CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifica
 
 public sealed record SetProductSpecificationsCommand(
     Guid ProductId,
-    AttributeValueBag Specifications)
-    : ICommand<SetProductSpecificationsResult>;
+    ProductSpecificationsInput Specifications)
+    : ICommand<SetProductSpecificationsResult>
+{
+    public SetProductSpecificationsCommand(
+        Guid productId,
+        AttributeValueBag specifications)
+        : this(
+            productId,
+            ProductSpecificationsInput.FromTypedBag(specifications))
+    {
+    }
+}
 
 public sealed record SetProductSpecificationsResult(
     Guid ProductId,
