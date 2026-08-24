@@ -9,6 +9,11 @@ public interface ICatalogSchemaValidator
         AttributeValueBag currentSpecifications,
         AttributeValueBag proposedSpecifications,
         EffectiveProductTypeSchema schema);
+
+    CatalogSchemaValidationResult ValidateVariantOptions(
+        AttributeValueBag currentOptions,
+        AttributeValueBag proposedOptions,
+        EffectiveProductTypeSchema schema);
 }
 
 public sealed record CatalogSchemaValidationResult(
