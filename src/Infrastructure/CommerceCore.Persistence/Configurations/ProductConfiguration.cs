@@ -78,6 +78,16 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_products_product_type");
 
+        builder.HasMany(product => product.Variants)
+            .WithOne()
+            .HasForeignKey("ProductId")
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("fk_product_variants_product");
+
+        builder.Navigation(product => product.Variants)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasQueryFilter(product => !product.IsDeleted);
 
         builder.Property(product => product.Id)
