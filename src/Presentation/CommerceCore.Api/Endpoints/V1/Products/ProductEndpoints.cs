@@ -1,10 +1,12 @@
 using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ActivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
 using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
@@ -152,6 +154,69 @@ public static class ProductEndpoints
         .Produces<GetProductVariantResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapPost(
+    "{productId:guid}/variants/{productVariantId:guid}/activate",
+    async (
+        Guid productId,
+        Guid productVariantId,
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+    {
+        ActivateProductVariantResult? result = await mediator.Send(
+            new ActivateProductVariantCommand(
+                productId,
+                productVariantId),
+            cancellationToken);
+
+        if (result is null)
+            return ProductVariantNotFound();
+
+        return Results.Ok(
+            new ActivateProductVariantResponse(
+                result.ProductId,
+                result.ProductVariantId,
+                result.Status,
+                result.Activated));
+    })
+.WithName("ActivateProductVariant")
+.Produces<ActivateProductVariantResponse>(StatusCodes.Status200OK)
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.ProducesProblem(StatusCodes.Status404NotFound)
+.ProducesProblem(StatusCodes.Status409Conflict)
+.ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+.ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapPost(
+            "{productId:guid}/variants/{productVariantId:guid}/deactivate",
+            async (
+                Guid productId,
+                Guid productVariantId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                DeactivateProductVariantResult? result = await mediator.Send(
+                    new DeactivateProductVariantCommand(
+                        productId,
+                        productVariantId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductVariantNotFound();
+
+                return Results.Ok(
+                    new DeactivateProductVariantResponse(
+                        result.ProductId,
+                        result.ProductVariantId,
+                        result.Status,
+                        result.Deactivated));
+            })
+        .WithName("DeactivateProductVariant")
+        .Produces<DeactivateProductVariantResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapPost(
@@ -429,12 +494,26 @@ public static class ProductEndpoints
         string Status,
         JsonElement Specifications,
         long ValidatedAgainstVersion);
+
+    public sealed record ActivateProductVariantResponse(
+        Guid ProductId,
+        Guid ProductVariantId,
+        string Status,
+        bool Activated);
+
+    public sealed record DeactivateProductVariantResponse(
+        Guid ProductId,
+        Guid ProductVariantId,
+        string Status,
+        bool Deactivated);
     private static IResult ProductVariantNotFound() => Results.Problem(
-    statusCode: StatusCodes.Status404NotFound,
-    type: "/problems/product-variant-not-found",
-    title: "Product variant was not found.");
+        statusCode: StatusCodes.Status404NotFound,
+        type: "/problems/product-variant-not-found",
+        title: "Product or product variant was not found.");
     private static IResult ProductNotFound() => Results.Problem(
             statusCode: StatusCodes.Status404NotFound,
             type: "/problems/product-not-found",
             title: "Product was not found.");
+
+
 }
