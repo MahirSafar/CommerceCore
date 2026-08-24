@@ -80,10 +80,48 @@ public sealed class ProductVariant : BaseEntity<ProductVariantId>
                 "A variant's currency cannot be changed.");
         }
 
+        if (Status == ProductVariantStatus.Active && newPrice.Amount == 0)
+        {
+            throw new ProductDomainException(
+                "product_variant.active_price_must_be_positive",
+                "The price of an active variant must be greater than zero.");
+        }
+
         if (Price == newPrice)
             return false;
 
         Price = newPrice;
+        return true;
+    }
+
+    internal bool Activate()
+    {
+        EnsureNotArchived();
+
+        if (Status == ProductVariantStatus.Active)
+            return false;
+
+        if (Price.Amount == 0)
+        {
+            throw new ProductDomainException(
+                "product_variant.activation_requires_price",
+                "A variant with a zero price cannot be activated.");
+        }
+
+        Status = ProductVariantStatus.Active;
+
+        return true;
+    }
+
+    internal bool Deactivate()
+    {
+        EnsureNotArchived();
+
+        if (Status != ProductVariantStatus.Active)
+            return false;
+
+        Status = ProductVariantStatus.Inactive;
+
         return true;
     }
 

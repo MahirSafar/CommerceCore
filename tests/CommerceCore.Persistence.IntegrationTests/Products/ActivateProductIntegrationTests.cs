@@ -3,6 +3,7 @@ using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
+using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
@@ -48,9 +49,11 @@ public sealed class ActivateProductIntegrationTests(
 
         dbContext.ChangeTracker.Clear();
 
-        Product persistedProduct = await dbContext.Products.SingleAsync(
-            item => item.Id == product.Id,
-            cancellationToken);
+        Product persistedProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
 
         Assert.Equal(ProductStatus.Active, persistedProduct.Status);
         Assert.Equal(42, persistedProduct.ValidatedAgainstVersion);
@@ -201,6 +204,14 @@ public sealed class ActivateProductIntegrationTests(
                     AttributeValue.Integer.Create(16)),
                 effectiveSchemaVersion: 1);
         }
+
+        ProductVariant variant = product.AddVariant(
+            VariantSku.Create($"activation-variant-{Guid.NewGuid():N}"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty,
+            isDefault: true);
+
+        product.ActivateVariant(variant.Id);
 
         dbContext.Products.Add(product);
 
