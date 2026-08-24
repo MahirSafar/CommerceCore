@@ -1,5 +1,6 @@
 ﻿using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
@@ -29,6 +30,7 @@ public sealed class ActivateProductCommandHandler(
         ProductId productId = ProductId.From(command.ProductId);
 
         Product? product = await _dbContext.Products
+            .Include(item => item.Variants)
             .SingleOrDefaultAsync(
                 item => item.Id == productId,
                 cancellationToken);
@@ -43,24 +45,30 @@ public sealed class ActivateProductCommandHandler(
                 "product.effective_schema_not_found",
                 $"Effective schema for product type '{product.ProductTypeId}' was not found.");
 
-        CatalogSchemaValidationResult validationResult =
+        List<ValidationFailure> failures = [];
+
+        AddValidationFailures(
             _schemaValidator.ValidateProductSpecifications(
                 product.Specifications,
                 product.Specifications,
-                schema);
+                schema),
+            "specifications",
+            failures);
 
-        if (!validationResult.IsValid)
+        foreach (ProductVariant variant in product.Variants.Where(
+                     item => item.Status == ProductVariantStatus.Active))
         {
-            IEnumerable<ValidationFailure> failures = validationResult.Errors
-                .Select(error => new ValidationFailure(
-                    $"specifications.{error.AttributeKey.Value}",
-                    error.Message)
-                {
-                    ErrorCode = error.Code
-                });
-
-            throw new ValidationException(failures);
+            AddValidationFailures(
+                _schemaValidator.ValidateVariantOptions(
+                    variant.Options,
+                    variant.Options,
+                    schema),
+                $"variants.{variant.Id.Value}.options",
+                failures);
         }
+
+        if (failures.Count > 0)
+            throw new ValidationException(failures);
 
         bool schemaVersionUpdated = product.ApplyValidatedSpecifications(
             product.Specifications,
@@ -74,5 +82,22 @@ public sealed class ActivateProductCommandHandler(
         return new ActivateProductResult(
             product.Id.Value,
             product.Status.ToString());
+    }
+
+    private static void AddValidationFailures(
+        CatalogSchemaValidationResult validationResult,
+        string propertyPrefix,
+        List<ValidationFailure> failures)
+    {
+        foreach (CatalogSchemaValidationError error
+                 in validationResult.Errors)
+        {
+            failures.Add(new ValidationFailure(
+                $"{propertyPrefix}.{error.AttributeKey.Value}",
+                error.Message)
+            {
+                ErrorCode = error.Code
+            });
+        }
     }
 }

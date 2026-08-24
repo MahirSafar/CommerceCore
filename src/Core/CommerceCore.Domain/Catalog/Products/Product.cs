@@ -143,14 +143,16 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         if (Status == ProductStatus.Active)
             return false;
 
-        if (Price.Amount == 0)
+        if (!_variants.Any(
+                variant => variant.Status == ProductVariantStatus.Active))
         {
             throw new ProductDomainException(
-                "product.activation_requires_price",
-                "A product with a zero price cannot be activated.");
+                "product.activation_requires_active_variant",
+                "A product requires at least one active variant before activation.");
         }
 
         Status = ProductStatus.Active;
+
         return true;
     }
 
@@ -239,22 +241,37 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         return variant;
     }
 
+    public bool ActivateVariant(ProductVariantId variantId)
+    {
+        EnsureNotArchived();
+
+        return GetVariant(variantId).Activate();
+    }
+
+    public bool DeactivateVariant(ProductVariantId variantId)
+    {
+        EnsureNotArchived();
+
+        ProductVariant variant = GetVariant(variantId);
+
+        if (Status == ProductStatus.Active &&
+            variant.Status == ProductVariantStatus.Active &&
+            _variants.Count(
+                item => item.Status == ProductVariantStatus.Active) == 1)
+        {
+            throw new ProductDomainException(
+                "product.last_active_variant_cannot_be_deactivated",
+                "Deactivate the product before deactivating its last active variant.");
+        }
+
+        return variant.Deactivate();
+    }
+
     public bool SetDefaultVariant(ProductVariantId variantId)
     {
         EnsureNotArchived();
 
-        if (variantId.Value == Guid.Empty)
-        {
-            throw new ArgumentException(
-                "Product variant ID cannot be empty.",
-                nameof(variantId));
-        }
-
-        ProductVariant variant = _variants.SingleOrDefault(
-            item => item.Id == variantId)
-            ?? throw new ProductDomainException(
-                "product.variant_not_found",
-                $"Variant '{variantId}' was not found on this product.");
+        ProductVariant variant = GetVariant(variantId);
 
         if (variant.Status == ProductVariantStatus.Archived)
         {
@@ -298,6 +315,22 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         ValidatedAgainstVersion = effectiveSchemaVersion;
 
         return true;
+    }
+
+    private ProductVariant GetVariant(ProductVariantId variantId)
+    {
+        if (variantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Product variant ID cannot be empty.",
+                nameof(variantId));
+        }
+
+        return _variants.SingleOrDefault(
+            item => item.Id == variantId)
+            ?? throw new ProductDomainException(
+                "product.variant_not_found",
+                $"Variant '{variantId}' was not found on this product.");
     }
 
     private static void EnsureValidName(LocalizedText name)

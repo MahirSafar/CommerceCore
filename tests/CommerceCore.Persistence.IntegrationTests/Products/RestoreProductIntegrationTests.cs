@@ -1,6 +1,8 @@
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
@@ -68,6 +70,14 @@ public sealed class RestoreProductIntegrationTests(
             Money.Create(79.99m, "USD"),
             SeededCatalogIds.LegacyUnclassifiedProductTypeId,
             new DateTimeOffset(2026, 8, 16, 10, 0, 0, TimeSpan.Zero));
+
+        ProductVariant variant = product.AddVariant(
+            VariantSku.Create($"restore-variant-{Guid.NewGuid():N}"),
+            Money.Create(79.99m, "USD"),
+            AttributeValueBag.Empty,
+            isDefault: true);
+
+        product.ActivateVariant(variant.Id);
 
         product.Activate();
 

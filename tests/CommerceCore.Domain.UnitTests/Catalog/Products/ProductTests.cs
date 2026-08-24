@@ -1,7 +1,9 @@
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Events;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
+using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Events;
 using CommerceCore.Domain.Common.ValueObjects;
@@ -24,7 +26,22 @@ public class ProductTests
             CreateValidPrice(),
             ProductTypeId.New(),
             TestTime);
-    
+
+    private static Product CreateProductWithActiveVariant()
+    {
+        Product product = CreateValidProduct();
+
+        ProductVariant variant = product.AddVariant(
+            VariantSku.Create("default-variant"),
+            CreateValidPrice(),
+            AttributeValueBag.Empty,
+            isDefault: true);
+
+        product.ActivateVariant(variant.Id);
+
+        return product;
+    }
+
     [Fact]
     public void Archive_ShouldRaiseProductArchivedDomainEvent()
     {
@@ -101,7 +118,7 @@ public class ProductTests
     [Fact]
     public void ActiveProduct_ChangePriceToZero_ThrowsProductDomainException()
     {
-        Product product = CreateValidProduct();
+        Product product = CreateProductWithActiveVariant();
         product.Activate();
 
         ProductDomainException ex = Assert.Throws<ProductDomainException>(() => product.ChangePrice(Money.Create(0m, product.Price.Currency)));
@@ -155,16 +172,18 @@ public class ProductTests
     }
 
     [Fact]
-    public void Activate_WithZeroPrice_ShouldThrowProductDomainException()
+    public void Activate_WithoutActiveVariant_ThrowsProductDomainException()
     {
-        Product product = Product.Create(
-            CreateValidName(),
-            CreateValidPrice(0),
-            ProductTypeId.New(),
-            TestTime);
+        Product product = CreateValidProduct();
 
-        ProductDomainException exception = Assert.Throws<ProductDomainException>(() => product.Activate());
-        Assert.Equal("product.activation_requires_price", exception.Code);
+        ProductDomainException exception = Assert.Throws<ProductDomainException>(
+            () => product.Activate());
+
+        Assert.Equal(
+            "product.activation_requires_active_variant",
+            exception.Code);
+
+        Assert.Equal(ProductStatus.Draft, product.Status);
     }
 
     [Fact]
@@ -184,7 +203,7 @@ public class ProductTests
     [Fact]
     public void Restore_ShouldSetStatusToInactive_IfProductWasActiveBeforeArchiving()
     {
-        Product product = CreateValidProduct();
+        Product product = CreateProductWithActiveVariant();
         product.Activate();
         product.Archive(TestTime, "Admin");
 
@@ -209,7 +228,7 @@ public class ProductTests
     [Fact]
     public void Activate_WithPositivePrice_SetsStatusToActive()
     {
-        Product product = CreateValidProduct();
+        Product product = CreateProductWithActiveVariant();
 
         bool result = product.Activate();
 
@@ -220,7 +239,7 @@ public class ProductTests
     [Fact]
     public void Activate_WhenAlreadyActive_ReturnsFalse()
     {
-        Product product = CreateValidProduct();
+        Product product = CreateProductWithActiveVariant();
 
         product.Activate();
 
@@ -233,7 +252,7 @@ public class ProductTests
     [Fact]
     public void Deactivate_WhenProductIsActive_SetsStatusToInactive()
     {
-        Product product = CreateValidProduct();
+        Product product = CreateProductWithActiveVariant();
         product.Activate();
 
         bool result = product.Deactivate();
