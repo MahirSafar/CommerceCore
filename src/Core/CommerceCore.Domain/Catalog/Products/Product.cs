@@ -7,12 +7,17 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using System.Collections.ObjectModel;
 
 namespace CommerceCore.Domain.Catalog.Products;
 
 public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 {
     public const int MaximumNameLength = 200;
+
+    private readonly List<ProductVariant> _variants = [];
+
+    private readonly ReadOnlyCollection<ProductVariant> _readOnlyVariants;
 
     public LocalizedText Name { get; private set; } = null!;
 
@@ -26,8 +31,11 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
     public ProductStatus Status { get; private set; }
 
+    public IReadOnlyCollection<ProductVariant> Variants => _readOnlyVariants;
+
     private Product()
     {
+        _readOnlyVariants = _variants.AsReadOnly();
     }
 
     private Product(
@@ -50,6 +58,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         Specifications = AttributeValueBag.Empty;
         ValidatedAgainstVersion = 0;
         Status = ProductStatus.Draft;
+        _readOnlyVariants = _variants.AsReadOnly();
     }
 
     public static Product Create(
@@ -70,7 +79,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
         EnsureValidName(name);
 
-        Product product = new Product(
+        Product product = new(
             ProductId.New(),
             name,
             price,
@@ -177,6 +186,90 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
         if (Status == ProductStatus.Active)
             Status = ProductStatus.Inactive;
+
+        return true;
+    }
+
+    public ProductVariant AddVariant(
+        VariantSku sku,
+        Money price,
+        AttributeValueBag options,
+        bool isDefault)
+    {
+        EnsureNotArchived();
+        ArgumentNullException.ThrowIfNull(price);
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (_variants.Any(variant => variant.Sku == sku))
+        {
+            throw new ProductDomainException(
+                "product.variant_sku_duplicate",
+                $"SKU '{sku.Value}' already exists on this product.");
+        }
+
+        if (_variants.Any(variant => variant.Options.Equals(options)))
+        {
+            throw new ProductDomainException(
+                "product.variant_options_duplicate",
+                "A variant with the same option combination already exists.");
+        }
+
+        if (_variants.Count == 0 && !isDefault)
+        {
+            throw new ProductDomainException(
+                "product.first_variant_must_be_default",
+                "The first variant of a product must be the default variant.");
+        }
+
+        if (isDefault && _variants.Any(variant => variant.IsDefault))
+        {
+            throw new ProductDomainException(
+                "product.default_variant_already_exists",
+                "A product can have only one default variant.");
+        }
+
+        ProductVariant variant = ProductVariant.Create(
+            sku,
+            price,
+            options,
+            isDefault);
+
+        _variants.Add(variant);
+
+        return variant;
+    }
+
+    public bool SetDefaultVariant(ProductVariantId variantId)
+    {
+        EnsureNotArchived();
+
+        if (variantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Product variant ID cannot be empty.",
+                nameof(variantId));
+        }
+
+        ProductVariant variant = _variants.SingleOrDefault(
+            item => item.Id == variantId)
+            ?? throw new ProductDomainException(
+                "product.variant_not_found",
+                $"Variant '{variantId}' was not found on this product.");
+
+        if (variant.Status == ProductVariantStatus.Archived)
+        {
+            throw new ProductDomainException(
+                "product.archived_variant_cannot_be_default",
+                "An archived variant cannot be the default variant.");
+        }
+
+        if (variant.IsDefault)
+            return false;
+
+        foreach (ProductVariant item in _variants)
+            item.SetDefault(false);
+
+        variant.SetDefault(true);
 
         return true;
     }
