@@ -26,6 +26,41 @@ public sealed class AttributeDefinitionTests
     }
 
     [Fact]
+    public void Create_VariantOptionWithSingleSelect_Succeeds()
+    {
+        AttributeDefinition definition = Create(
+            dataType: AttributeDataType.SingleSelect,
+            scope: AttributeScope.VariantOption);
+
+        Assert.Equal(AttributeScope.VariantOption, definition.Scope);
+        Assert.Equal(AttributeDataType.SingleSelect, definition.DataType);
+    }
+
+    [Theory]
+    [InlineData(AttributeDataType.Text)]
+    [InlineData(AttributeDataType.Integer)]
+    [InlineData(AttributeDataType.Decimal)]
+    [InlineData(AttributeDataType.Boolean)]
+    [InlineData(AttributeDataType.MultiSelect)]
+    [InlineData(AttributeDataType.Measurement)]
+    public void Create_VariantOptionWithNonSingleSelect_ThrowsDomainException(
+        AttributeDataType dataType)
+    {
+        ProductTypeDomainException exception = Assert.Throws<
+            ProductTypeDomainException>(() => Create(
+                dataType: dataType,
+                scope: AttributeScope.VariantOption,
+                measurementUnitFamily:
+                    dataType == AttributeDataType.Measurement
+                        ? MeasurementUnitFamily.Create("mass")
+                        : null));
+
+        Assert.Equal(
+            "attribute_definition.variant_option_must_be_single_select",
+            exception.Code);
+    }
+
+    [Fact]
     public void AddOption_ForSingleSelect_AddsOption()
     {
         AttributeDefinition definition = Create(dataType: AttributeDataType.SingleSelect);
@@ -147,6 +182,7 @@ public sealed class AttributeDefinitionTests
 
     private static AttributeDefinition Create(
         AttributeDataType dataType = AttributeDataType.Text,
+        AttributeScope scope = AttributeScope.ProductSpecification, 
         bool isRequired = false,
         decimal? minimumValue = null,
         decimal? maximumValue = null,
@@ -158,7 +194,7 @@ public sealed class AttributeDefinitionTests
             ProductTypeId.New(),
             AttributeKey.Create("sample_attribute"),
             dataType,
-            AttributeScope.ProductSpecification,
+            scope,
             isRequired,
             displayOrder: 0,
             minimumValue,

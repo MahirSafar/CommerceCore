@@ -33,6 +33,8 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
 
         ValidateDisplayOrder(displayOrder);
 
+        ValidateScopeDataType(dataType, scope);
+
         ValidateConstraints(
             dataType,
             minimumValue,
@@ -261,6 +263,21 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
                 "attribute_definition.deprecated",
                 $"Attribute '{Key}' is deprecated and cannot be changed.");
         }
+    }
+
+    private static void ValidateScopeDataType(
+        AttributeDataType dataType,
+        AttributeScope scope)
+    {
+        if (scope != AttributeScope.VariantOption)
+            return;
+
+        if (dataType == AttributeDataType.SingleSelect)
+            return;
+
+        throw new ProductTypeDomainException(
+            "attribute_definition.variant_option_must_be_single_select",
+            "A variant option attribute must use the SingleSelect data type.");
     }
 
     private static void ValidateDisplayOrder(int displayOrder)
