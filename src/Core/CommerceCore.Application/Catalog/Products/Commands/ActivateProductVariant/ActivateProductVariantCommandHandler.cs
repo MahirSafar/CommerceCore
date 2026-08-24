@@ -1,5 +1,6 @@
 ﻿using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using FluentValidation;
 using FluentValidation.Results;
@@ -26,10 +27,12 @@ public sealed class ActivateProductVariantCommandHandler(
         ActivateProductVariantCommand command,
         CancellationToken cancellationToken)
     {
+        ProductId productId = ProductId.From(command.ProductId);
+
         Product? product = await _dbContext.Products
             .Include(item => item.Variants)
             .SingleOrDefaultAsync(
-                item => item.Id.Value == command.ProductId,
+                item => item.Id == productId,
                 cancellationToken);
 
         if (product is null)

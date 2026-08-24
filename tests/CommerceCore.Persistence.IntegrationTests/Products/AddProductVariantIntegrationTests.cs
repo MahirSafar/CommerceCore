@@ -1,7 +1,11 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
+﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProductVariant;
+using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
+using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.Products.Enums;
+using CommerceCore.Domain.Catalog.Products.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
@@ -116,6 +120,196 @@ public sealed class AddProductVariantIntegrationTests(
         Assert.Empty(persistedProduct.Variants);
     }
 
+    [Fact]
+    public async Task Handle_WithValidDraftVariant_ActivatesAndPersistsStatus()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        AddProductVariantResult added = await CreateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new AddProductVariantCommand(
+                product.Id.Value,
+                $"laptop-black-{Guid.NewGuid():N}",
+                1299.99m,
+                "USD",
+                Options("space-black"),
+                IsDefault: true),
+            cancellationToken);
+
+        ActivateProductVariantResult? result = await CreateActivateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new ActivateProductVariantCommand(
+                product.Id.Value,
+                added.ProductVariantId),
+            cancellationToken);
+
+        Assert.NotNull(result);
+        Assert.True(result.Activated);
+        Assert.Equal("Active", result.Status);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
+
+        ProductVariant variant = Assert.Single(persistedProduct.Variants);
+
+        Assert.Equal(ProductVariantStatus.Active, variant.Status);
+    }
+
+    [Fact]
+    public async Task Handle_WhenParentIsNotActive_DeactivatesActiveVariant()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        AddProductVariantResult added = await CreateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new AddProductVariantCommand(
+                product.Id.Value,
+                $"laptop-black-{Guid.NewGuid():N}",
+                1299.99m,
+                "USD",
+                Options("space-black"),
+                IsDefault: true),
+            cancellationToken);
+
+        await CreateActivateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new ActivateProductVariantCommand(
+                product.Id.Value,
+                added.ProductVariantId),
+            cancellationToken);
+
+        DeactivateProductVariantResult? result =
+            await CreateDeactivateHandler(dbContext).Handle(
+                new DeactivateProductVariantCommand(
+                    product.Id.Value,
+                    added.ProductVariantId),
+                cancellationToken);
+
+        Assert.NotNull(result);
+        Assert.True(result.Deactivated);
+        Assert.Equal("Inactive", result.Status);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
+
+        Assert.Equal(ProductStatus.Draft, persistedProduct.Status);
+        Assert.Equal(
+            ProductVariantStatus.Inactive,
+            Assert.Single(persistedProduct.Variants).Status);
+    }
+
+    [Fact]
+    public async Task Handle_WhenVariantIsLastActiveOfActiveProduct_ThrowsDomainException()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        AddProductVariantResult added = await CreateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new AddProductVariantCommand(
+                product.Id.Value,
+                $"laptop-black-{Guid.NewGuid():N}",
+                1299.99m,
+                "USD",
+                Options("space-black"),
+                IsDefault: true),
+            cancellationToken);
+
+        await CreateActivateHandler(
+            scope.ServiceProvider,
+            dbContext).Handle(
+            new ActivateProductVariantCommand(
+                product.Id.Value,
+                added.ProductVariantId),
+            cancellationToken);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product activeProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
+
+        activeProduct.Activate();
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        ProductDomainException exception = await Assert.ThrowsAsync<
+            ProductDomainException>(() =>
+                CreateDeactivateHandler(dbContext).Handle(
+                    new DeactivateProductVariantCommand(
+                        product.Id.Value,
+                        added.ProductVariantId),
+                    cancellationToken).AsTask());
+
+        Assert.Equal(
+            "product.last_active_variant_cannot_be_deactivated",
+            exception.Code);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
+
+        Assert.Equal(ProductStatus.Active, persistedProduct.Status);
+        Assert.Equal(
+            ProductVariantStatus.Active,
+            Assert.Single(persistedProduct.Variants).Status);
+    }
+
+
+
     private static AddProductVariantCommandHandler CreateHandler(
         IServiceProvider services,
         CommerceCoreDbContext dbContext) =>
@@ -124,6 +318,21 @@ public sealed class AddProductVariantIntegrationTests(
             services.GetRequiredService<
                 IProductTypeEffectiveSchemaReader>(),
             services.GetRequiredService<ICatalogSchemaValidator>());
+
+    private static ActivateProductVariantCommandHandler
+    CreateActivateHandler(
+        IServiceProvider services,
+        CommerceCoreDbContext dbContext) =>
+    new(
+        dbContext,
+        services.GetRequiredService<
+            IProductTypeEffectiveSchemaReader>(),
+        services.GetRequiredService<ICatalogSchemaValidator>());
+
+    private static DeactivateProductVariantCommandHandler
+        CreateDeactivateHandler(
+            CommerceCoreDbContext dbContext) =>
+        new(dbContext);
 
     private static async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
