@@ -1,4 +1,5 @@
 using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.ArchiveProduct;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductName;
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
@@ -7,6 +8,7 @@ using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
 using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
+using CommerceCore.Application.Catalog.Products.Queries.GetProductVariantById;
 using Mediator;
 using System.Text.Json;
 
@@ -22,6 +24,29 @@ public static class ProductEndpoints
         string? Currency);
 
     public sealed record CreateProductResponse(Guid ProductId);
+    public sealed record AddProductVariantRequest(
+    string? Sku,
+    decimal PriceAmount,
+    string? Currency,
+    JsonElement Options,
+    bool IsDefault);
+
+    public sealed record AddProductVariantResponse(
+        Guid ProductId,
+        Guid ProductVariantId,
+        string Sku,
+        string Status,
+        bool IsDefault);
+
+    public sealed record GetProductVariantResponse(
+        Guid ProductId,
+        Guid ProductVariantId,
+        string Sku,
+        decimal PriceAmount,
+        string Currency,
+        string Status,
+        bool IsDefault,
+        JsonElement Options);
     public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints
@@ -93,6 +118,85 @@ public static class ProductEndpoints
         .Produces(StatusCodes.Status404NotFound)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapGet(
+            "{productId:guid}/variants/{productVariantId:guid}",
+            async (
+                Guid productId,
+                Guid productVariantId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                GetProductVariantByIdResult? result = await mediator.Send(
+                    new GetProductVariantByIdQuery(
+                        productId,
+                        productVariantId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductVariantNotFound();
+
+                return Results.Ok(
+                    new GetProductVariantResponse(
+                        result.ProductId,
+                        result.ProductVariantId,
+                        result.Sku,
+                        result.PriceAmount,
+                        result.Currency,
+                        result.Status,
+                        result.IsDefault,
+                        AttributeValueBagResponseSerializer.Serialize(
+                            result.Options)));
+            })
+        .WithName("GetProductVariantById")
+        .Produces<GetProductVariantResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapPost(
+            "{productId:guid}/variants",
+            async (
+                Guid productId,
+                AddProductVariantRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                var options = VariantOptionsRequestParser.Parse(
+                    request.Options);
+
+                AddProductVariantResult result = await mediator.Send(
+                    new AddProductVariantCommand(
+                        productId,
+                        request.Sku ?? string.Empty,
+                        request.PriceAmount,
+                        request.Currency ?? string.Empty,
+                        options,
+                        request.IsDefault),
+                    cancellationToken);
+
+                return Results.CreatedAtRoute(
+                    "GetProductVariantById",
+                    new
+                    {
+                        productId = result.ProductId,
+                        productVariantId = result.ProductVariantId
+                    },
+                    new AddProductVariantResponse(
+                        result.ProductId,
+                        result.ProductVariantId,
+                        result.Sku,
+                        result.Status,
+                        result.IsDefault));
+            })
+        .WithName("AddProductVariant")
+        .Produces<AddProductVariantResponse>(StatusCodes.Status201Created)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
 
         group.MapPost(
             "{productId:guid}/activate",
@@ -325,7 +429,10 @@ public static class ProductEndpoints
         string Status,
         JsonElement Specifications,
         long ValidatedAgainstVersion);
-
+    private static IResult ProductVariantNotFound() => Results.Problem(
+    statusCode: StatusCodes.Status404NotFound,
+    type: "/problems/product-variant-not-found",
+    title: "Product variant was not found.");
     private static IResult ProductNotFound() => Results.Problem(
             statusCode: StatusCodes.Status404NotFound,
             type: "/problems/product-not-found",
