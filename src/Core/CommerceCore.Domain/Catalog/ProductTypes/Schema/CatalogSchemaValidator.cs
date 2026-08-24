@@ -9,10 +9,31 @@ public sealed class CatalogSchemaValidator : ICatalogSchemaValidator
     public CatalogSchemaValidationResult ValidateProductSpecifications(
         AttributeValueBag currentSpecifications,
         AttributeValueBag proposedSpecifications,
-        EffectiveProductTypeSchema schema)
+        EffectiveProductTypeSchema schema) =>
+        ValidateAttributes(
+            currentSpecifications,
+            proposedSpecifications,
+            schema,
+            AttributeScope.ProductSpecification);
+
+    public CatalogSchemaValidationResult ValidateVariantOptions(
+        AttributeValueBag currentOptions,
+        AttributeValueBag proposedOptions,
+        EffectiveProductTypeSchema schema) =>
+        ValidateAttributes(
+            currentOptions,
+            proposedOptions,
+            schema,
+            AttributeScope.VariantOption);
+
+    private static CatalogSchemaValidationResult ValidateAttributes(
+        AttributeValueBag currentAttributes,
+        AttributeValueBag proposedAttributes,
+        EffectiveProductTypeSchema schema,
+        AttributeScope expectedScope)
     {
-        ArgumentNullException.ThrowIfNull(currentSpecifications);
-        ArgumentNullException.ThrowIfNull(proposedSpecifications);
+        ArgumentNullException.ThrowIfNull(currentAttributes);
+        ArgumentNullException.ThrowIfNull(proposedAttributes);
         ArgumentNullException.ThrowIfNull(schema);
 
         if (schema.EffectiveSchemaVersion <= 0)
@@ -28,9 +49,11 @@ public sealed class CatalogSchemaValidator : ICatalogSchemaValidator
         List<CatalogSchemaValidationError> errors = [];
 
         foreach ((AttributeKey key, AttributeValue value)
-                 in proposedSpecifications.Values)
+                 in proposedAttributes.Values)
         {
-            if (!definitions.TryGetValue(key, out EffectiveAttributeDefinition? definition))
+            if (!definitions.TryGetValue(
+                    key,
+                    out EffectiveAttributeDefinition? definition))
             {
                 AddError(
                     errors,
@@ -41,19 +64,21 @@ public sealed class CatalogSchemaValidator : ICatalogSchemaValidator
                 continue;
             }
 
-            if (definition.Scope != AttributeScope.ProductSpecification)
+            if (definition.Scope != expectedScope)
             {
                 AddError(
                     errors,
                     key,
                     "catalog_schema.invalid_scope",
-                    $"Attribute '{key.Value}' belongs to variant options, not product specifications.");
+                    $"Attribute '{key.Value}' belongs to " +
+                    $"{DescribeScope(definition.Scope)}, not " +
+                    $"{DescribeScope(expectedScope)}.");
 
                 continue;
             }
 
             bool isUnchanged = IsUnchanged(
-                currentSpecifications,
+                currentAttributes,
                 key,
                 value);
 
@@ -81,15 +106,16 @@ public sealed class CatalogSchemaValidator : ICatalogSchemaValidator
 
         foreach (EffectiveAttributeDefinition definition in definitions.Values)
         {
-            if (definition.Scope != AttributeScope.ProductSpecification ||
+            if (definition.Scope != expectedScope ||
                 definition.IsDeprecated ||
                 !definition.IsRequired ||
-                definition.EnforcementStatus != AttributeEnforcementStatus.Enforced)
+                definition.EnforcementStatus !=
+                    AttributeEnforcementStatus.Enforced)
             {
                 continue;
             }
 
-            if (!proposedSpecifications.Contains(definition.Key))
+            if (!proposedAttributes.Contains(definition.Key))
             {
                 AddError(
                     errors,
@@ -101,6 +127,16 @@ public sealed class CatalogSchemaValidator : ICatalogSchemaValidator
 
         return new CatalogSchemaValidationResult(errors);
     }
+
+    private static string DescribeScope(AttributeScope scope) => scope switch
+    {
+        AttributeScope.ProductSpecification => "product specifications",
+        AttributeScope.VariantOption => "variant options",
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(scope),
+            scope,
+            "Unsupported attribute scope.")
+    };
 
     private static Dictionary<AttributeKey, EffectiveAttributeDefinition>
         CreateDefinitionMap(EffectiveProductTypeSchema schema)
