@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Common.Exceptions;
+using CommerceCore.Domain.Common.Exceptions;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -94,6 +94,15 @@ public sealed class GlobalExceptionHandler(
             problem,
             cancellationToken);
     }
+
+    private static int GetDomainProblemStatusCode(string code) => code switch
+    {
+        "product.last_active_variant_cannot_be_deactivated" =>
+            StatusCodes.Status409Conflict,
+
+        _ => StatusCodes.Status422UnprocessableEntity
+    };
+
     private static async Task WriteDomainProblemAsync(
        HttpContext httpContext,
        DomainException exception,
@@ -104,7 +113,7 @@ public sealed class GlobalExceptionHandler(
             Type = $"/problems/{exception.Code}",
             Title = "A business rule was violated.",
             Detail = exception.Message,
-            Status = StatusCodes.Status422UnprocessableEntity,
+            Status = GetDomainProblemStatusCode(exception.Code),
             Instance = httpContext.Request.Path
         };
 

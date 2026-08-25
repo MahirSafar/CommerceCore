@@ -64,7 +64,7 @@ public static class VariantOptionsRequestParser
                 continue;
             }
 
-            result = result.With(key, value);
+            result = result.With(key, value!);
         }
 
         if (failures.Count > 0)
