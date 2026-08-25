@@ -8,6 +8,7 @@ using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProduct;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.RestoreProduct;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductDefaultVariant;
 using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductVariantById;
@@ -217,6 +218,37 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapPut(
+            "{productId:guid}/variants/{productVariantId:guid}/default",
+            async (
+                Guid productId,
+                Guid productVariantId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                SetProductDefaultVariantResult? result = await mediator.Send(
+                    new SetProductDefaultVariantCommand(
+                        productId,
+                        productVariantId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductVariantNotFound();
+
+                return Results.Ok(
+                    new SetProductDefaultVariantResponse(
+                        result.ProductId,
+                        result.ProductVariantId,
+                        result.DefaultChanged));
+            })
+        .WithName("SetProductDefaultVariant")
+        .Produces<SetProductDefaultVariantResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapPost(
@@ -506,6 +538,12 @@ public static class ProductEndpoints
         Guid ProductVariantId,
         string Status,
         bool Deactivated);
+
+    public sealed record SetProductDefaultVariantResponse(
+    Guid ProductId,
+    Guid ProductVariantId,
+    bool DefaultChanged);
+
     private static IResult ProductVariantNotFound() => Results.Problem(
         statusCode: StatusCodes.Status404NotFound,
         type: "/problems/product-variant-not-found",

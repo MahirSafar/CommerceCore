@@ -1,6 +1,7 @@
 ﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductDefaultVariant;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
@@ -118,6 +119,77 @@ public sealed class AddProductVariantIntegrationTests(
                 cancellationToken);
 
         Assert.Empty(persistedProduct.Variants);
+    }
+
+    [Fact]
+    public async Task Handle_WithAnotherVariant_MakesItTheOnlyDefaultVariant()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        AddProductVariantCommandHandler addHandler = CreateHandler(
+            scope.ServiceProvider,
+            dbContext);
+
+        AddProductVariantResult first = await addHandler.Handle(
+            new AddProductVariantCommand(
+                product.Id.Value,
+                $"laptop-black-{Guid.NewGuid():N}",
+                1299.99m,
+                "USD",
+                Options("space-black"),
+                IsDefault: true),
+            cancellationToken);
+
+        AddProductVariantResult second = await addHandler.Handle(
+            new AddProductVariantCommand(
+                product.Id.Value,
+                $"laptop-silver-{Guid.NewGuid():N}",
+                1349.99m,
+                "USD",
+                Options("silver"),
+                IsDefault: false),
+            cancellationToken);
+
+        SetProductDefaultVariantResult? result =
+            await CreateSetDefaultHandler(dbContext).Handle(
+                new SetProductDefaultVariantCommand(
+                    product.Id.Value,
+                    second.ProductVariantId),
+                cancellationToken);
+
+        Assert.NotNull(result);
+        Assert.True(result.DefaultChanged);
+        Assert.Equal(product.Id.Value, result.ProductId);
+        Assert.Equal(second.ProductVariantId, result.ProductVariantId);
+
+        dbContext.ChangeTracker.Clear();
+
+        Product persistedProduct = await dbContext.Products
+            .Include(item => item.Variants)
+            .SingleAsync(
+                item => item.Id == product.Id,
+                cancellationToken);
+
+        ProductVariant firstVariant = persistedProduct.Variants.Single(
+            item => item.Id.Value == first.ProductVariantId);
+
+        ProductVariant secondVariant = persistedProduct.Variants.Single(
+            item => item.Id.Value == second.ProductVariantId);
+
+        Assert.False(firstVariant.IsDefault);
+        Assert.True(secondVariant.IsDefault);
+        Assert.Single(persistedProduct.Variants, item => item.IsDefault);
     }
 
     [Fact]
@@ -334,6 +406,11 @@ public sealed class AddProductVariantIntegrationTests(
             CommerceCoreDbContext dbContext) =>
         new(dbContext);
 
+    private static SetProductDefaultVariantCommandHandler
+    CreateSetDefaultHandler(
+        CommerceCoreDbContext dbContext) =>
+    new(dbContext);
+
     private static async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
         CancellationToken cancellationToken)
@@ -372,6 +449,12 @@ public sealed class AddProductVariantIntegrationTests(
                       "id": "00000000-0000-0000-0000-000000000011",
                       "code": "space-black",
                       "displayOrder": 0,
+                      "isDeprecated": false
+                    },
+                    {
+                      "id": "00000000-0000-0000-0000-000000000012",
+                      "code": "silver",
+                      "displayOrder": 1,
                       "isDeprecated": false
                     }
                   ],
