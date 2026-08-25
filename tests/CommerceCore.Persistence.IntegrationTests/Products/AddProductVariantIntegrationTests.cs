@@ -2,6 +2,7 @@
 using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.SetProductDefaultVariant;
+using CommerceCore.Application.Catalog.Products.Queries.GetProductVariants;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
@@ -190,6 +191,71 @@ public sealed class AddProductVariantIntegrationTests(
         Assert.False(firstVariant.IsDefault);
         Assert.True(secondVariant.IsDefault);
         Assert.Single(persistedProduct.Variants, item => item.IsDefault);
+    }
+
+    [Fact]
+    public async Task Handle_ReturnsProductVariants_WithDefaultVariantFirst()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        Product product = await SeedProductAsync(
+            dbContext,
+            cancellationToken);
+
+        AddProductVariantCommandHandler addHandler = CreateHandler(
+            scope.ServiceProvider,
+            dbContext);
+
+        AddProductVariantResult defaultVariant =
+            await addHandler.Handle(
+                new AddProductVariantCommand(
+                    product.Id.Value,
+                    $"laptop-black-{Guid.NewGuid():N}",
+                    1299.99m,
+                    "USD",
+                    Options("space-black"),
+                    IsDefault: true),
+                cancellationToken);
+
+        AddProductVariantResult secondaryVariant =
+            await addHandler.Handle(
+                new AddProductVariantCommand(
+                    product.Id.Value,
+                    $"laptop-silver-{Guid.NewGuid():N}",
+                    1349.99m,
+                    "USD",
+                    Options("silver"),
+                    IsDefault: false),
+                cancellationToken);
+
+        GetProductVariantsResult? result = await CreateListHandler(
+            dbContext).Handle(
+            new GetProductVariantsQuery(product.Id.Value),
+            cancellationToken);
+
+        Assert.NotNull(result);
+        Assert.Equal(product.Id.Value, result.ProductId);
+        Assert.Equal(2, result.Variants.Count);
+
+        GetProductVariantListItem first = result.Variants[0];
+        GetProductVariantListItem second = result.Variants[1];
+
+        Assert.Equal(defaultVariant.ProductVariantId, first.ProductVariantId);
+        Assert.True(first.IsDefault);
+        Assert.Equal("Draft", first.Status);
+        Assert.Equal("space-black", GetColor(first.Options));
+
+        Assert.Equal(secondaryVariant.ProductVariantId, second.ProductVariantId);
+        Assert.False(second.IsDefault);
+        Assert.Equal("Draft", second.Status);
+        Assert.Equal("silver", GetColor(second.Options));
     }
 
     [Fact]
@@ -411,6 +477,10 @@ public sealed class AddProductVariantIntegrationTests(
         CommerceCoreDbContext dbContext) =>
     new(dbContext);
 
+    private static GetProductVariantsQueryHandler CreateListHandler(
+        CommerceCoreDbContext dbContext) =>
+        new(dbContext);
+
     private static async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
         CancellationToken cancellationToken)
@@ -521,6 +591,17 @@ public sealed class AddProductVariantIntegrationTests(
     {
         Assert.True(
             variant.Options.TryGetValue(
+                AttributeKey.Create("color"),
+                out AttributeValue? value));
+
+        return Assert.IsType<AttributeValue.SingleSelect>(
+            value).OptionCode;
+    }
+
+    private static string GetColor(AttributeValueBag options)
+    {
+        Assert.True(
+            options.TryGetValue(
                 AttributeKey.Create("color"),
                 out AttributeValue? value));
 
