@@ -157,36 +157,36 @@ public static class ProductEndpoints
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapPost(
-    "{productId:guid}/variants/{productVariantId:guid}/activate",
-    async (
-        Guid productId,
-        Guid productVariantId,
-        IMediator mediator,
-        CancellationToken cancellationToken) =>
-    {
-        ActivateProductVariantResult? result = await mediator.Send(
-            new ActivateProductVariantCommand(
-                productId,
-                productVariantId),
-            cancellationToken);
+            "{productId:guid}/variants/{productVariantId:guid}/activate",
+            async (
+                Guid productId,
+                Guid productVariantId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                ActivateProductVariantResult? result = await mediator.Send(
+                    new ActivateProductVariantCommand(
+                        productId,
+                        productVariantId),
+                    cancellationToken);
 
-        if (result is null)
-            return ProductVariantNotFound();
+                if (result is null)
+                    return ProductVariantNotFound();
 
-        return Results.Ok(
-            new ActivateProductVariantResponse(
-                result.ProductId,
-                result.ProductVariantId,
-                result.Status,
-                result.Activated));
-    })
-.WithName("ActivateProductVariant")
-.Produces<ActivateProductVariantResponse>(StatusCodes.Status200OK)
-.ProducesProblem(StatusCodes.Status400BadRequest)
-.ProducesProblem(StatusCodes.Status404NotFound)
-.ProducesProblem(StatusCodes.Status409Conflict)
-.ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
-.ProducesProblem(StatusCodes.Status500InternalServerError);
+                return Results.Ok(
+                    new ActivateProductVariantResponse(
+                        result.ProductId,
+                        result.ProductVariantId,
+                        result.Status,
+                        result.Activated));
+            })
+        .WithName("ActivateProductVariant")
+        .Produces<ActivateProductVariantResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
 
         group.MapPost(
             "{productId:guid}/variants/{productVariantId:guid}/deactivate",
