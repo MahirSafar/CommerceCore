@@ -20,7 +20,7 @@ public sealed class ProductVariantLifecycleTests
             ProductDomainException>(() => product.Activate());
 
         Assert.Equal(
-            "product.activation_requires_active_variant",
+            "product.activation_requires_active_default_variant",
             exception.Code);
     }
 
@@ -81,7 +81,7 @@ public sealed class ProductVariantLifecycleTests
                 product.DeactivateVariant(variant.Id));
 
         Assert.Equal(
-            "product.last_active_variant_cannot_be_deactivated",
+            "product.active_default_variant_cannot_be_deactivated",
             exception.Code);
     }
 
@@ -103,5 +103,93 @@ public sealed class ProductVariantLifecycleTests
             ProductTypeId.New(),
             new DateTimeOffset(
                 2026, 8, 24, 18, 0, 0, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void Activate_WhenOnlyNonDefaultVariantIsActive_ThrowsDomainException()
+    {
+        Product product = CreateProduct();
+
+        ProductVariant defaultVariant = product.AddVariant(
+            VariantSku.Create("laptop-white"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty.With(
+                AttributeKey.Create("color"),
+                AttributeValue.SingleSelect.Create("white")),
+            isDefault: true);
+
+        ProductVariant nonDefault = product.AddVariant(
+            VariantSku.Create("laptop-black"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty.With(
+                AttributeKey.Create("color"),
+                AttributeValue.SingleSelect.Create("black")),
+            isDefault: false);
+
+        product.ActivateVariant(nonDefault.Id);
+
+        ProductDomainException exception = Assert.Throws<
+            ProductDomainException>(() => product.Activate());
+
+        Assert.Equal(
+            "product.activation_requires_active_default_variant",
+            exception.Code);
+    }
+
+    [Fact]
+    public void SetDefaultVariant_WhenProductIsActiveAndVariantIsNotActive_ThrowsDomainException()
+    {
+        Product product = CreateProduct();
+
+        ProductVariant defaultVariant = product.AddVariant(
+            VariantSku.Create("laptop-white"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty.With(
+                AttributeKey.Create("color"),
+                AttributeValue.SingleSelect.Create("white")),
+            isDefault: true);
+
+        ProductVariant draftVariant = product.AddVariant(
+            VariantSku.Create("laptop-black"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty.With(
+                AttributeKey.Create("color"),
+                AttributeValue.SingleSelect.Create("black")),
+            isDefault: false);
+
+        // Activate default variant and the product
+        product.ActivateVariant(defaultVariant.Id);
+        product.Activate();
+
+        ProductDomainException exception = Assert.Throws<
+            ProductDomainException>(() => product.SetDefaultVariant(draftVariant.Id));
+
+        Assert.Equal(
+            "product.active_default_variant_must_be_active",
+            exception.Code);
+    }
+
+    [Fact]
+    public void DeactivateVariant_WhenProductIsActiveAndVariantIsActiveDefault_ThrowsDomainException()
+    {
+        Product product = CreateProduct();
+
+        ProductVariant defaultVariant = product.AddVariant(
+            VariantSku.Create("laptop-white"),
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty.With(
+                AttributeKey.Create("color"),
+                AttributeValue.SingleSelect.Create("white")),
+            isDefault: true);
+
+        product.ActivateVariant(defaultVariant.Id);
+        product.Activate();
+
+        ProductDomainException exception = Assert.Throws<
+            ProductDomainException>(() => product.DeactivateVariant(defaultVariant.Id));
+
+        Assert.Equal(
+            "product.active_default_variant_cannot_be_deactivated",
+            exception.Code);
     }
 }

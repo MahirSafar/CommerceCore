@@ -23,8 +23,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
+          global-json-file: global.json
 
       - name: Restore NuGet Packages
         run: dotnet restore CommerceCore.slnx
@@ -32,11 +31,5 @@ jobs:
       - name: Build Solution (Release Mode)
         run: dotnet build CommerceCore.slnx --no-restore --configuration Release
 
-      - name: Run Domain Unit Tests
-        run: dotnet test tests/CommerceCore.Domain.UnitTests/CommerceCore.Domain.UnitTests.csproj --no-build --configuration Release --verbosity normal
-
-      - name: Run Architecture Tests
-        run: dotnet test tests/CommerceCore.ArchitectureTests/CommerceCore.ArchitectureTests.csproj --no-build --configuration Release --verbosity normal
-
-      - name: Run Persistence Integration Tests (Testcontainers)
-        run: dotnet test tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj --no-build --configuration Release --verbosity normal
+      - name: Run complete test suite
+        run: dotnet test CommerceCore.slnx --no-build --configuration Release --verbosity normal

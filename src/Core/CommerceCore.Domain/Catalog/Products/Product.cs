@@ -144,15 +144,15 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
             return false;
 
         if (!_variants.Any(
-                variant => variant.Status == ProductVariantStatus.Active))
+                variant => variant.IsDefault &&
+                           variant.Status == ProductVariantStatus.Active))
         {
             throw new ProductDomainException(
-                "product.activation_requires_active_variant",
-                "A product requires at least one active variant before activation.");
+                "product.activation_requires_active_default_variant",
+                "A product requires an active default variant before activation.");
         }
 
         Status = ProductStatus.Active;
-
         return true;
     }
 
@@ -255,13 +255,12 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         ProductVariant variant = GetVariant(variantId);
 
         if (Status == ProductStatus.Active &&
-            variant.Status == ProductVariantStatus.Active &&
-            _variants.Count(
-                item => item.Status == ProductVariantStatus.Active) == 1)
+            variant.IsDefault &&
+            variant.Status == ProductVariantStatus.Active)
         {
             throw new ProductDomainException(
-                "product.last_active_variant_cannot_be_deactivated",
-                "Deactivate the product before deactivating its last active variant.");
+                "product.active_default_variant_cannot_be_deactivated",
+                "Set another active variant as default or deactivate the product first.");
         }
 
         return variant.Deactivate();
@@ -273,11 +272,12 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
         ProductVariant variant = GetVariant(variantId);
 
-        if (variant.Status == ProductVariantStatus.Archived)
+        if (Status == ProductStatus.Active &&
+            variant.Status != ProductVariantStatus.Active)
         {
             throw new ProductDomainException(
-                "product.archived_variant_cannot_be_default",
-                "An archived variant cannot be the default variant.");
+                "product.active_default_variant_must_be_active",
+                "An active product's default variant must be active.");
         }
 
         if (variant.IsDefault)
