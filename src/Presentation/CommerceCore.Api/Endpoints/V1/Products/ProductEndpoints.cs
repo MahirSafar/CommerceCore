@@ -12,6 +12,7 @@ using CommerceCore.Application.Catalog.Products.Commands.SetProductDefaultVarian
 using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductVariantById;
+using CommerceCore.Application.Catalog.Products.Queries.GetProductVariants;
 using Mediator;
 using System.Text.Json;
 
@@ -119,6 +120,43 @@ public static class ProductEndpoints
         .WithName("GetProductById")
         .Produces<GetProductResponse>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status404NotFound)
+        .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        group.MapGet(
+            "{productId:guid}/variants",
+            async (
+                Guid productId,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                GetProductVariantsResult? result = await mediator.Send(
+                    new GetProductVariantsQuery(productId),
+                    cancellationToken);
+
+                if (result is null)
+                    return ProductNotFound();
+
+                GetProductVariantListItemResponse[] variants = result.Variants
+                    .Select(item => new GetProductVariantListItemResponse(
+                        item.ProductVariantId,
+                        item.Sku,
+                        item.PriceAmount,
+                        item.Currency,
+                        item.Status,
+                        item.IsDefault,
+                        AttributeValueBagResponseSerializer.Serialize(
+                            item.Options)))
+                    .ToArray();
+
+                return Results.Ok(
+                    new GetProductVariantsResponse(
+                        result.ProductId,
+                        variants));
+            })
+        .WithName("GetProductVariants")
+        .Produces<GetProductVariantsResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status500InternalServerError);
 
@@ -543,6 +581,19 @@ public static class ProductEndpoints
     Guid ProductId,
     Guid ProductVariantId,
     bool DefaultChanged);
+
+    public sealed record GetProductVariantsResponse(
+    Guid ProductId,
+    IReadOnlyList<GetProductVariantListItemResponse> Variants);
+
+    public sealed record GetProductVariantListItemResponse(
+        Guid ProductVariantId,
+        string Sku,
+        decimal PriceAmount,
+        string Currency,
+        string Status,
+        bool IsDefault,
+        JsonElement Options);
 
     private static IResult ProductVariantNotFound() => Results.Problem(
         statusCode: StatusCodes.Status404NotFound,
