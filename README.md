@@ -6,7 +6,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.6-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4?style=flat&logo=dotnet)](https://docs.microsoft.com/ef/core/)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20DDD%20%2F%20CQRS-blueviolet?style=flat)]()
-[![Tests](https://img.shields.io/badge/Tests-113%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
+[![Tests](https://img.shields.io/badge/Tests-195%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
 
 **CommerceCore** is an enterprise-grade, high-performance modular e-commerce backend built with **.NET 10**, adhering strictly to the principles of **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS (Command Query Responsibility Segregation)**.
 
@@ -102,7 +102,7 @@ CommerceCore follows **Clean Architecture** (Onion / Hexagonal Architecture) wit
 - **Optimistic Concurrency via PostgreSQL `xmin`**: Uses PostgreSQL system column `xmin` (`IsRowVersion()`) to detect concurrent modifications and automatically return HTTP `409 Conflict` problem details.
 - **Soft Deletion & Global Query Filters**: Entities inheriting `SoftDeletableAggregateRoot<TKey>` automatically apply `!IsDeleted` EF Core query filters while supporting restoration workflows (`IgnoreQueryFilters()`).
 - **Standardized RFC 7807 Error Responses**: Custom `IExceptionHandler` (`GlobalExceptionHandler`) produces structured JSON problem details with correlation trace IDs for validation errors (400), domain invariant violations (422), concurrency conflicts (409), not found (404), and unhandled server faults (500).
-- **100% Automated Test Coverage**: 113 automated tests across architectural integrity (`NetArchTest`), domain invariants (`xUnit v3`), and real PostgreSQL integration tests (`Testcontainers.PostgreSql`).
+- **Automated Verification**: 195 tests across architectural integrity (`NetArchTest`), domain invariants (`xUnit v3`), API behavior, and real PostgreSQL integration tests (`Testcontainers.PostgreSql`).
 
 ---
 
@@ -125,7 +125,6 @@ CommerceCore/
 │   │   │   │   ├── Products/               # Product Aggregate, Status, Events, Exceptions, ProductId
 │   │   │   │   ├── ProductTypes/           # ProductType Aggregate, AttributeDefinition, AttributeOption,
 │   │   │   │   │                           # Data Types, Enforcement Status, Measurement Families
-│   │   │   │   └── ProductVariants/        # Product Variant Identifiers
 │   │   │   └── Common/                     # BaseEntity, AggregateRoot, Auditable & SoftDelete base classes,
 │   │   │                                   # Value Objects (Money, LanguageCode, LocalizedText)
 │   │   │
@@ -192,14 +191,15 @@ Inherits `SoftDeletableAggregateRoot<ProductId>`:
 
 - **Identity**: `ProductId` (wrapping UUIDv7 `Guid`).
 - **Name**: `LocalizedText` stored as JSONB with default language guarantee.
-- **Price**: `Money` with ISO 4217 3-letter currency code and precision scale $\le 4$.
+- **Variants**: A product owns explicit variants, each with a SKU, price, options, lifecycle status, and a single default variant.
+- **Current price model**: `Money` uses ISO 4217 3-letter currency codes and precision scale $\le 4$. A dedicated Pricing context with market-specific price lists is the planned authority for multi-currency selling prices.
 - **Status**: `ProductStatus` (`Draft = 1`, `Active = 2`, `Inactive = 3`).
 - **Audit & Soft-Delete**: `CreatedAtUtc`, `CreatedBy`, `UpdatedAtUtc`, `UpdatedBy`, `IsDeleted`, `DeletedAtUtc`, `DeletedBy`.
 
 #### Core Lifecycle Invariants:
 1. **Creation**: Products are initialized in `Draft` status and emit `ProductCreatedDomainEvent`.
-2. **Price & Currency**: A product's currency is immutable once created. An active product cannot have a zero price (`product.active_price_must_be_positive`).
-3. **Activation**: Requires a positive price amount (`product.activation_requires_price`).
+2. **Price & Currency**: Currency is immutable for a product or variant price. Active products and variants cannot have a zero price.
+3. **Activation**: A product requires an active default variant; a variant requires a positive price before activation.
 4. **Deactivation**: Only active products can be deactivated.
 5. **Archiving (Soft Delete)**: Idempotent soft deletion stamping UTC timestamp and actor, emitting `ProductArchivedDomainEvent`. Modifying archived products is forbidden (`product.archived`).
 6. **Restoration**: Restoring an archived product that was previously `Active` resets its status to `Inactive` to prevent accidental immediate exposure.
@@ -555,13 +555,14 @@ OpenAPI documentation is available at `/openapi/v1.json`.
 
 ## Testing Strategy
 
-The repository includes a comprehensive, multi-tiered testing suite with **113 passing automated tests**:
+The repository includes a comprehensive, multi-tiered testing suite with **195 passing automated tests** at the current baseline:
 
 ```
 tests/
 ├── CommerceCore.ArchitectureTests/            # Architecture & layer dependency rules (NetArchTest)
 ├── CommerceCore.Domain.UnitTests/             # Domain entities, value objects & business invariants
-└── CommerceCore.Persistence.IntegrationTests/ # EF Core & PostgreSQL tests with Testcontainers
+├── CommerceCore.Persistence.IntegrationTests/ # EF Core & PostgreSQL tests with Testcontainers
+└── CommerceCore.Api.UnitTests/                # Endpoint serialization and error-contract behavior
 ```
 
 ### Run Architecture Tests

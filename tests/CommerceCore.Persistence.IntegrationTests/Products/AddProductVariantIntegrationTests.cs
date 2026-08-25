@@ -373,7 +373,7 @@ public sealed class AddProductVariantIntegrationTests(
     }
 
     [Fact]
-    public async Task Handle_WhenVariantIsLastActiveOfActiveProduct_ThrowsDomainException()
+    public async Task Handle_WhenVariantIsActiveDefaultOfActiveProduct_ThrowsDomainException()
     {
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
@@ -429,7 +429,7 @@ public sealed class AddProductVariantIntegrationTests(
                     cancellationToken).AsTask());
 
         Assert.Equal(
-            "product.last_active_variant_cannot_be_deactivated",
+            "product.active_default_variant_cannot_be_deactivated",
             exception.Code);
 
         dbContext.ChangeTracker.Clear();

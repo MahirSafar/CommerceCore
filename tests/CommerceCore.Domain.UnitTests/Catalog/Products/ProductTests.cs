@@ -180,7 +180,7 @@ public class ProductTests
             () => product.Activate());
 
         Assert.Equal(
-            "product.activation_requires_active_variant",
+            "product.activation_requires_active_default_variant",
             exception.Code);
 
         Assert.Equal(ProductStatus.Draft, product.Status);

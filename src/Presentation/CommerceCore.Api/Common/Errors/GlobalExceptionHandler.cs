@@ -97,7 +97,9 @@ public sealed class GlobalExceptionHandler(
 
     private static int GetDomainProblemStatusCode(string code) => code switch
     {
-        "product.last_active_variant_cannot_be_deactivated" =>
+        "product.last_active_variant_cannot_be_deactivated" or
+        "product.active_default_variant_cannot_be_deactivated" or
+        "product.active_default_variant_must_be_active" =>
             StatusCodes.Status409Conflict,
 
         _ => StatusCodes.Status422UnprocessableEntity

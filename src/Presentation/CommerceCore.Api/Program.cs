@@ -1,4 +1,5 @@
 using CommerceCore.Api.Common.Errors;
+using CommerceCore.Api.Common.HealthChecks;
 using CommerceCore.Api.Endpoints.V1.Products;
 using CommerceCore.Api.Endpoints.V1.ProductTypes;
 using CommerceCore.Api.Identity;
@@ -8,6 +9,8 @@ using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Application.Common.Behaviors;
 using CommerceCore.Infrastructure.Common.Time;
 using CommerceCore.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +33,12 @@ builder.Services.AddMediator(options =>
 });
 builder.Services.AddPersistence(connectionString);
 
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgreSqlHealthCheck>(
+        "postgresql",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"]);
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -43,6 +52,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapHealthChecks(
+    "/health/live",
+    new HealthCheckOptions
+    {
+        Predicate = _ => false
+    })
+    .AllowAnonymous();
+
+app.MapHealthChecks(
+    "/health/ready",
+    new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    })
+    .AllowAnonymous();
+
 app.MapProductEndpoints();
 app.MapProductTypeEndpoints();
 
