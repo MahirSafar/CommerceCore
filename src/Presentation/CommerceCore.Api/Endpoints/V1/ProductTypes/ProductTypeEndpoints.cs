@@ -1,6 +1,7 @@
 ﻿using CommerceCore.Application.Catalog.ProductTypes.Commands.AddAttributeOption;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
+using CommerceCore.Api.Identity;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using Mediator;
 
@@ -35,7 +36,8 @@ public static class ProductTypeEndpoints
     {
         var group = endpoints
             .MapGroup("/api/product-types")
-            .WithTags("Product Types");
+            .WithTags("Product Types")
+            .RequireAuthorization(AuthorizationPolicies.CatalogRead);
 
         group.MapPost(
             string.Empty,
@@ -56,6 +58,8 @@ public static class ProductTypeEndpoints
                     new CreateProductTypeResponse(result.ProductTypeId));
             })
             .WithName("CreateProductType")
+            .RequireAuthorization(
+                AuthorizationPolicies.CatalogSchemaManage)
             .Produces<CreateProductTypeResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
@@ -114,6 +118,8 @@ public static class ProductTypeEndpoints
                     new DefineAttributeResponse(result.AttributeDefinitionId));
             })
             .WithName("DefineProductTypeAttribute")
+            .RequireAuthorization(
+                AuthorizationPolicies.CatalogSchemaManage)
             .Produces<DefineAttributeResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
@@ -142,6 +148,8 @@ public static class ProductTypeEndpoints
                     new AddAttributeOptionResponse(result.AttributeOptionId));
             })
             .WithName("AddProductTypeAttributeOption")
+            .RequireAuthorization(
+                AuthorizationPolicies.CatalogSchemaManage)
             .Produces<AddAttributeOptionResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)

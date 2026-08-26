@@ -13,6 +13,7 @@ using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecification
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductVariantById;
 using CommerceCore.Application.Catalog.Products.Queries.GetProductVariants;
+using CommerceCore.Api.Identity;
 using Mediator;
 using System.Text.Json;
 
@@ -55,7 +56,8 @@ public static class ProductEndpoints
     {
         RouteGroupBuilder group = endpoints
             .MapGroup("/api/products")
-            .WithTags("Products");
+            .WithTags("Products")
+            .RequireAuthorization(AuthorizationPolicies.CatalogRead);
 
         group.MapPost(
             string.Empty,
@@ -81,6 +83,7 @@ public static class ProductEndpoints
                     new CreateProductResponse(result.ProductId));
             })
         .WithName("CreateProduct")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<CreateProductResponse>(
             StatusCodes.Status201Created)
         .ProducesValidationProblem(
@@ -220,6 +223,7 @@ public static class ProductEndpoints
                         result.Activated));
             })
         .WithName("ActivateProductVariant")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<ActivateProductVariantResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -252,6 +256,7 @@ public static class ProductEndpoints
                         result.Deactivated));
             })
         .WithName("DeactivateProductVariant")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<DeactivateProductVariantResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -282,6 +287,7 @@ public static class ProductEndpoints
                         result.DefaultChanged));
             })
         .WithName("SetProductDefaultVariant")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<SetProductDefaultVariantResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -325,6 +331,7 @@ public static class ProductEndpoints
                         result.IsDefault));
             })
         .WithName("AddProductVariant")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<AddProductVariantResponse>(StatusCodes.Status201Created)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -353,6 +360,7 @@ public static class ProductEndpoints
                         result.Status));
             })
         .WithName("ActivateProduct")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<ActivateProductResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -380,6 +388,7 @@ public static class ProductEndpoints
                         result.Status));
             })
         .WithName("DeactivateProduct")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<DeactivateProductResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -407,6 +416,7 @@ public static class ProductEndpoints
                         result.ArchivedAtUtc));
             })
         .WithName("ArchiveProduct")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<ArchiveProductResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -435,6 +445,7 @@ public static class ProductEndpoints
                         result.Restored));
             })
         .WithName("RestoreProduct")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<RestoreProductResponse>(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -467,6 +478,7 @@ public static class ProductEndpoints
                         result.Status));
             })
         .WithName("ChangeProductPrice")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<ProductPriceResponse>(StatusCodes.Status200OK)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -500,6 +512,7 @@ public static class ProductEndpoints
                         result.Status));
             })
         .WithName("ChangeProductName")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<ProductNameResponse>(StatusCodes.Status200OK)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
@@ -531,6 +544,7 @@ public static class ProductEndpoints
                         result.Changed));
             })
         .WithName("SetProductSpecifications")
+        .RequireAuthorization(AuthorizationPolicies.CatalogManage)
         .Produces<SetProductSpecificationsResponse>(StatusCodes.Status200OK)
         .ProducesValidationProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status404NotFound)
