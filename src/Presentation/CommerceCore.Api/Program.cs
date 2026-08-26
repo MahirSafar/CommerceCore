@@ -10,6 +10,8 @@ using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Application.Common.Behaviors;
 using CommerceCore.Infrastructure.Common.Time;
 using CommerceCore.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,6 +22,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using System.Globalization;
 using System.Threading.RateLimiting;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +42,20 @@ if (!builder.Environment.IsDevelopment() &&
 {
     throw new InvalidOperationException(
         "AllowedHosts must contain explicit host names outside Development.");
+}
+
+string? authenticationAuthority = builder.Configuration[
+    "Authentication:Schemes:Bearer:Authority"];
+
+string? authenticationAudience = builder.Configuration[
+    "Authentication:Schemes:Bearer:Audience"];
+
+if (!builder.Environment.IsDevelopment() &&
+    (string.IsNullOrWhiteSpace(authenticationAuthority) ||
+     string.IsNullOrWhiteSpace(authenticationAudience)))
+{
+    throw new InvalidOperationException(
+        "Bearer Authority and Audience must be configured outside Development.");
 }
 
 builder.WebHost.ConfigureKestrel(options =>
@@ -147,6 +164,45 @@ if (!string.IsNullOrWhiteSpace(
             .AddOtlpExporter());
 }
 
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+
+AuthorizationPolicy fallbackPolicy =
+    new AuthorizationPolicyBuilder(
+            JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(fallbackPolicy)
+    .AddPolicy(
+        AuthorizationPolicies.CatalogRead,
+        policy => policy
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context =>
+                HasScope(context, "catalog.read")))
+    .AddPolicy(
+        AuthorizationPolicies.CatalogManage,
+        policy => policy
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context =>
+                HasScope(context, "catalog.manage")))
+    .AddPolicy(
+        AuthorizationPolicies.CatalogSchemaManage,
+        policy => policy
+            .AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme)
+            .RequireAuthenticatedUser()
+            .RequireAssertion(context =>
+                HasScope(
+                    context,
+                    "catalog.schema.manage")));
+
 builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
@@ -179,12 +235,14 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseRateLimiter();
+app.UseAuthorization();
 
 app.MapHealthChecks(
     "/health/live",
@@ -240,4 +298,17 @@ static async ValueTask WriteRateLimitProblemAsync(
     await response.WriteAsJsonAsync(
         problem,
         cancellationToken: cancellationToken);
+}
+
+static bool HasScope(
+    AuthorizationHandlerContext context,
+    string requiredScope)
+{
+    return context.User
+        .FindAll("scope")
+        .SelectMany(claim => claim.Value.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries |
+            StringSplitOptions.TrimEntries))
+        .Contains(requiredScope, StringComparer.Ordinal);
 }
