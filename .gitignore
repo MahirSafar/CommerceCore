@@ -75,3 +75,8 @@ project.fragment.lock.json
 Thumbs.db
 ehthumbs.db
 [Dd]esktop.ini
+
+# Local Docker Compose secrets
+.env
+.env.*
+!.env.example
