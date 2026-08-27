@@ -10,7 +10,10 @@ internal static class SecurityExtensions
     {
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+            .AddJwtBearer(options =>
+            {
+                options.MapInboundClaims = false;
+            });
 
         AuthorizationPolicy fallbackPolicy =
             new AuthorizationPolicyBuilder(

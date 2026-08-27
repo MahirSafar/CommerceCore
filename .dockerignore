@@ -1,0 +1,12 @@
+.git/
+.vs/
+.idea/
+tests/
+**/bin/
+**/obj/
+**/TestResults/
+**/*.user
+**/*.suo
+.env
+.env.*
+!.env.example

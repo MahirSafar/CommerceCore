@@ -26,6 +26,8 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("ConnectionStrings:CommerceCoreDatabase", "Host=localhost;Database=dummy;Username=postgres;Password=postgres");
+
             builder.ConfigureTestServices(services =>
             {
                 services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
