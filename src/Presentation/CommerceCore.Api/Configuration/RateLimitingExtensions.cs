@@ -29,9 +29,27 @@ internal static class RateLimitingExtensions
                             HttpMethods.IsHead(httpContext.Request.Method) ||
                             HttpMethods.IsOptions(httpContext.Request.Method);
 
-                        string clientKey =
-                            httpContext.Connection.RemoteIpAddress?.ToString()
-                            ?? "unknown";
+                        string clientKey = "unknown";
+
+                        if (httpContext.User.Identity?.IsAuthenticated == true)
+                        {
+                            string? sub = httpContext.User.FindFirst("sub")?.Value;
+                            string? clientId = httpContext.User.FindFirst("client_id")?.Value;
+
+                            if (!string.IsNullOrEmpty(sub))
+                            {
+                                clientKey = $"user:{sub}";
+                            }
+                            else if (!string.IsNullOrEmpty(clientId))
+                            {
+                                clientKey = $"client:{clientId}";
+                            }
+                        }
+
+                        if (clientKey == "unknown")
+                        {
+                            clientKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        }
 
                         string partitionKey =
                             $"{(isReadRequest ? "read" : "write")}:{clientKey}";
