@@ -85,3 +85,8 @@ ehthumbs.db
 [Tt]est[Rr]esults/
 *.trx
 *.coverage
+
+# Local Documentation & Blueprints (Not tracked in repository)
+docs/
+infra/
+CommerceCoreRoadmap.md
