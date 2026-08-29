@@ -80,3 +80,8 @@ ehthumbs.db
 .env
 .env.*
 !.env.example
+
+# Test Results
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
