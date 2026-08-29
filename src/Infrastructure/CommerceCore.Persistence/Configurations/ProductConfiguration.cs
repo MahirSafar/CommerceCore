@@ -5,6 +5,7 @@ using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.Serialization;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -22,20 +23,26 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             {
                 new AttributeValueBagJsonConverter()
             }
-        }; private sealed record LocalizedTextDocument(string DefaultLanguage, Dictionary<string, string> Translations);
-    private static string SerializeLocalizedText(LocalizedText localizedText) => JsonSerializer.Serialize(new LocalizedTextDocument(localizedText.DefaultLanguage.Value, localizedText.Translations.ToDictionary(pair => pair.Key.Value, pair => pair.Value, StringComparer.Ordinal)));
+        };
+
+    private sealed record LocalizedTextDocument(string DefaultLanguage, Dictionary<string, string> Translations);
+
+    private static string SerializeLocalizedText(LocalizedText localizedText) =>
+        JsonSerializer.Serialize(new LocalizedTextDocument(localizedText.DefaultLanguage.Value, localizedText.Translations.ToDictionary(pair => pair.Key.Value, pair => pair.Value, StringComparer.Ordinal)));
+
     private static LocalizedText DeserializeLocalizedText(string json)
     {
-        var document = JsonSerializer.Deserialize<LocalizedTextDocument>(json, JsonOptions) ?? throw new InvalidOperationException("LocalizedText JSON cannot be null.");
+        var document = JsonSerializer.Deserialize<LocalizedTextDocument>(json, JsonOptions)
+            ?? throw new InvalidOperationException("LocalizedText JSON cannot be null.");
 
         return LocalizedText.Create(LanguageCode.Create(document.DefaultLanguage), document.Translations.Select(pair => new KeyValuePair<LanguageCode, string>(LanguageCode.Create(pair.Key), pair.Value)));
     }
+
     private static readonly ValueConverter<LocalizedText, string> LocalizedTextConverter = new(localizedText => SerializeLocalizedText(localizedText), json => DeserializeLocalizedText(json));
 
-    private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left,right) => ReferenceEquals(left, right) || left!.Equals(right), value => value.GetHashCode(), value => value);
+    private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left, right) => ReferenceEquals(left, right) || left!.Equals(right), value => value.GetHashCode(), value => value);
 
-    private static readonly ValueComparer<AttributeValueBag>
-    AttributeValueBagComparer = new(
+    private static readonly ValueComparer<AttributeValueBag> AttributeValueBagComparer = new(
         (left, right) => left!.Equals(right),
         value => value.GetHashCode(),
         value => JsonSerializer.Deserialize<AttributeValueBag>(
@@ -47,6 +54,23 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.ToTable("products", schema: "catalog");
 
         builder.HasKey(product => product.Id);
+
+        builder.Property(product => product.Id)
+            .HasColumnName("id")
+            .HasConversion(
+                productId => productId.Value,
+                value => ProductId.From(value))
+            .ValueGeneratedNever();
+
+        builder.Property(product => product.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
+
+        builder.HasAlternateKey(product => new { product.TenantId, product.Id })
+            .HasName("ux_products_tenant_id_id");
 
         builder.Property(product => product.ProductTypeId)
             .HasColumnName("product_type_id")
@@ -74,13 +98,15 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.HasOne<ProductType>()
             .WithMany()
-            .HasForeignKey(product => product.ProductTypeId)
+            .HasPrincipalKey(productType => new { productType.TenantId, productType.Id })
+            .HasForeignKey(product => new { product.TenantId, product.ProductTypeId })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_products_product_type");
 
         builder.HasMany(product => product.Variants)
             .WithOne()
-            .HasForeignKey("ProductId")
+            .HasPrincipalKey(product => new { product.TenantId, product.Id })
+            .HasForeignKey("TenantId", "ProductId")
             .IsRequired()
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName("fk_product_variants_product");
@@ -89,13 +115,6 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasQueryFilter(product => !product.IsDeleted);
-
-        builder.Property(product => product.Id)
-            .HasColumnName("id")
-            .HasConversion(
-                productId => productId.Value,
-                value => ProductId.From(value))
-            .ValueGeneratedNever();
 
         builder.Property(product => product.Status)
             .HasColumnName("status")
@@ -146,13 +165,18 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.HasIndex(product => new
         {
+            product.TenantId,
             product.Status,
             product.IsDeleted
-        });
+        }).HasDatabaseName("ix_products_tenant_status_is_deleted");
 
-        builder.HasIndex(product => product.ProductTypeId)
-            .HasFilter("\"is_deleted\" = FALSE")
-            .HasDatabaseName("ix_products_not_deleted_product_type_id");
+        builder.HasIndex(product => new
+        {
+            product.TenantId,
+            product.ProductTypeId
+        })
+        .HasFilter("\"is_deleted\" = FALSE")
+        .HasDatabaseName("ix_products_tenant_not_deleted_product_type_id");
 
         builder.OwnsOne(product => product.Price, price =>
         {
@@ -174,6 +198,5 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         });
 
         builder.Navigation(product => product.Price).IsRequired();
-
     }
 }

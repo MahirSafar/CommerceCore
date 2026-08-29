@@ -1,9 +1,10 @@
-﻿using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
+using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CommerceCore.Persistence.IntegrationTests.ProductTypes;
@@ -17,6 +18,8 @@ public sealed class AttributeKeyHierarchyIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
@@ -28,9 +31,13 @@ public sealed class AttributeKeyHierarchyIntegrationTests(
         IAttributeDefinitionRegistry attributeDefinitionRegistry = scope.ServiceProvider
             .GetRequiredService<IAttributeDefinitionRegistry>();
 
+        ITenantContext tenantContext = scope.ServiceProvider
+            .GetRequiredService<ITenantContext>();
+
         CreateProductTypeCommandHandler createHandler = new(
             dbContext,
-            schemaCoordinator);
+            schemaCoordinator,
+            tenantContext);
 
         DefineAttributeCommandHandler defineHandler = new(
             dbContext,
@@ -61,6 +68,8 @@ public sealed class AttributeKeyHierarchyIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
@@ -72,9 +81,13 @@ public sealed class AttributeKeyHierarchyIntegrationTests(
         IAttributeDefinitionRegistry attributeDefinitionRegistry = scope.ServiceProvider
             .GetRequiredService<IAttributeDefinitionRegistry>();
 
+        ITenantContext tenantContext = scope.ServiceProvider
+            .GetRequiredService<ITenantContext>();
+
         CreateProductTypeCommandHandler createHandler = new(
             dbContext,
-            schemaCoordinator);
+            schemaCoordinator,
+            tenantContext);
 
         DefineAttributeCommandHandler defineHandler = new(
             dbContext,

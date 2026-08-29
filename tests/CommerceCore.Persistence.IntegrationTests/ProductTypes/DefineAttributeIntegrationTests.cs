@@ -7,6 +7,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Persistence.ProductTypes;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +22,8 @@ public sealed class DefineAttributeIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
@@ -32,9 +35,13 @@ public sealed class DefineAttributeIntegrationTests(
         IAttributeDefinitionRegistry attributeDefinitionRegistry = scope.ServiceProvider
             .GetRequiredService<IAttributeDefinitionRegistry>();
 
+        ITenantContext tenantContext = scope.ServiceProvider
+            .GetRequiredService<ITenantContext>();
+
         CreateProductTypeCommandHandler createProductTypeHandler = new(
             dbContext,
-            schemaCoordinator);
+            schemaCoordinator,
+            tenantContext);
 
         CreateProductTypeResult rootResult = await createProductTypeHandler.Handle(
             new CreateProductTypeCommand(

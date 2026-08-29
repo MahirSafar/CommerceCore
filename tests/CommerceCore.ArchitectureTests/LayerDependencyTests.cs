@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using NetArchTest.Rules;
 
 namespace CommerceCore.ArchitectureTests;
@@ -16,6 +16,43 @@ public sealed class LayerDependencyTests
 
     private static readonly Assembly InfrastructureAssembly =
         LoadAssembly("CommerceCore.Infrastructure");
+
+    private static readonly Assembly CatalogDomainAssembly =
+        LoadAssembly("CommerceCore.Modules.Catalog.Domain");
+
+    private static readonly Assembly PlatformContractsAssembly =
+        LoadAssembly("CommerceCore.Platform.Contracts");
+
+    [Fact]
+    public void CatalogDomain_Must_Not_Depend_On_Outer_Layers()
+    {
+        AssertHasNoDependencyOn(
+            CatalogDomainAssembly,
+            "CommerceCore.Application",
+            "CommerceCore.Modules.Catalog.Application",
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "Microsoft.EntityFrameworkCore",
+            "Npgsql",
+            "Microsoft.AspNetCore",
+            "FluentValidation",
+            "Mediator");
+    }
+
+    [Fact]
+    public void PlatformContracts_Must_Not_Depend_On_Outer_Layers()
+    {
+        AssertHasNoDependencyOn(
+            PlatformContractsAssembly,
+            "CommerceCore.Domain",
+            "CommerceCore.Application",
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "Microsoft.EntityFrameworkCore",
+            "Microsoft.AspNetCore");
+    }
 
     [Fact]
     public void Domain_Must_Not_Depend_On_Outer_Layers()

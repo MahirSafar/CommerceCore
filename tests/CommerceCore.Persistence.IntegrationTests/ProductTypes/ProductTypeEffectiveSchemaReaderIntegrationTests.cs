@@ -1,8 +1,9 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +18,8 @@ public sealed class ProductTypeEffectiveSchemaReaderIntegrationTests(
     {
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
+
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
 
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
@@ -82,6 +85,7 @@ public sealed class ProductTypeEffectiveSchemaReaderIntegrationTests(
             $"""
             INSERT INTO catalog.product_types (
                 id,
+                tenant_id,
                 code,
                 is_assignable,
                 own_schema_version,
@@ -89,6 +93,7 @@ public sealed class ProductTypeEffectiveSchemaReaderIntegrationTests(
                 created_by)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 {productTypeCode},
                 TRUE,
                 0,
@@ -101,11 +106,13 @@ public sealed class ProductTypeEffectiveSchemaReaderIntegrationTests(
             $"""
             INSERT INTO catalog.product_type_effective_schema (
                 product_type_id,
+                tenant_id,
                 effective_schema_version,
                 schema,
                 updated_at_utc)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 42,
                 CAST({schemaJson} AS jsonb),
                 CURRENT_TIMESTAMP);
@@ -150,6 +157,8 @@ public sealed class ProductTypeEffectiveSchemaReaderIntegrationTests(
     {
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
+
+        fixture.SetTenantForCurrentTest();
 
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();

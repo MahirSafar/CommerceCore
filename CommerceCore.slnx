@@ -8,6 +8,17 @@
     <Project Path="src/Infrastructure/CommerceCore.Infrastructure/CommerceCore.Infrastructure.csproj" />
     <Project Path="src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/CommerceCore.Modules.Catalog.Application/CommerceCore.Modules.Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/CommerceCore.Modules.Catalog.Contracts/CommerceCore.Modules.Catalog.Contracts.csproj" />
+    <Project Path="src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/CommerceCore.Modules.Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/CommerceCore.Modules.Catalog.Infrastructure/CommerceCore.Modules.Catalog.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Platform/">
+    <Project Path="src/Platform/CommerceCore.Platform.Contracts/CommerceCore.Platform.Contracts.csproj" />
+    <Project Path="src/Platform/CommerceCore.Platform.ControlPlane/CommerceCore.Platform.ControlPlane.csproj" />
+    <Project Path="src/Platform/CommerceCore.Platform.Identity/CommerceCore.Platform.Identity.csproj" />
+  </Folder>
   <Folder Name="/src/Presentation/">
     <Project Path="src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj" />
   </Folder>

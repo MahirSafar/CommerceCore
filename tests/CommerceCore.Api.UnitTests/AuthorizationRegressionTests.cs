@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using NSubstitute;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -57,6 +58,25 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                         HealthStatus.Unhealthy,
                         new[] { "ready" }));
                 });
+
+                var mockTenantStore = NSubstitute.Substitute.For<CommerceCore.Platform.ControlPlane.IPlatformTenantStore>();
+                mockTenantStore.GetMembershipByUserSubjectAsync(NSubstitute.Arg.Any<string>(), NSubstitute.Arg.Any<CancellationToken>())
+                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.TenantMembership
+                    {
+                        TenantId = Guid.NewGuid(),
+                        UserSubject = "test-user",
+                        Role = "Admin",
+                        Status = "Active"
+                    });
+                mockTenantStore.GetStorefrontByHostAsync(NSubstitute.Arg.Any<string>(), NSubstitute.Arg.Any<CancellationToken>())
+                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.Storefront
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = Guid.NewGuid(),
+                        HostName = "localhost",
+                        IsActive = true
+                    });
+                services.AddScoped(_ => mockTenantStore);
             });
             
             builder.UseEnvironment("Development");

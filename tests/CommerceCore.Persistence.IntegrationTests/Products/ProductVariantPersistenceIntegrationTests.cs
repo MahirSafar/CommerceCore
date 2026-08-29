@@ -1,11 +1,13 @@
-﻿using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,13 +23,25 @@ public sealed class ProductVariantPersistenceIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        Product product = CreateProduct();
+        var productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        Product product = CreateProduct(tenantId, productType.Id);
 
         ProductVariant black = product.AddVariant(
             VariantSku.Create($"laptop-black-{Guid.NewGuid():N}"),
@@ -82,23 +96,35 @@ public sealed class ProductVariantPersistenceIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
+        var productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         VariantSku sharedSku = VariantSku.Create(
             $"global-sku-{Guid.NewGuid():N}");
 
-        Product firstProduct = CreateProduct();
+        Product firstProduct = CreateProduct(tenantId, productType.Id);
         firstProduct.AddVariant(
             sharedSku,
             Money.Create(100m, "USD"),
             AttributeValueBag.Empty,
             isDefault: true);
 
-        Product secondProduct = CreateProduct();
+        Product secondProduct = CreateProduct(tenantId, productType.Id);
         secondProduct.AddVariant(
             sharedSku,
             Money.Create(200m, "USD"),
@@ -111,7 +137,7 @@ public sealed class ProductVariantPersistenceIntegrationTests(
             () => dbContext.SaveChangesAsync(cancellationToken));
     }
 
-    private static Product CreateProduct()
+    private static Product CreateProduct(TenantId tenantId, ProductTypeId productTypeId)
     {
         LanguageCode language = LanguageCode.Create("en");
 
@@ -124,9 +150,10 @@ public sealed class ProductVariantPersistenceIntegrationTests(
             ]);
 
         return Product.Create(
+            tenantId,
             name,
             Money.Create(1000m, "USD"),
-            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
+            productTypeId,
             new DateTimeOffset(
                 2026, 8, 24, 12, 0, 0, TimeSpan.Zero));
     }

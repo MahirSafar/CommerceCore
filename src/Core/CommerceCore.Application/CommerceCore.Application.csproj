@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />
@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CommerceCore.Domain\CommerceCore.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Domain\CommerceCore.Modules.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

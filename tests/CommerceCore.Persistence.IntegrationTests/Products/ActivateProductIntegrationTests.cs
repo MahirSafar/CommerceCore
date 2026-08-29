@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
+using CommerceCore.Application.Catalog.Products.Commands.ActivateProduct;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
@@ -9,6 +9,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,10 @@ public sealed class ActivateProductIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -33,6 +38,7 @@ public sealed class ActivateProductIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
+            tenantId,
             hasRamSpecification: true,
             cancellationToken);
 
@@ -65,6 +71,10 @@ public sealed class ActivateProductIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -73,6 +83,7 @@ public sealed class ActivateProductIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
+            tenantId,
             hasRamSpecification: false,
             cancellationToken);
 
@@ -114,6 +125,7 @@ public sealed class ActivateProductIntegrationTests(
 
     private static async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
+        TenantId tenantId,
         bool hasRamSpecification,
         CancellationToken cancellationToken)
     {
@@ -149,6 +161,7 @@ public sealed class ActivateProductIntegrationTests(
             $"""
             INSERT INTO catalog.product_types (
                 id,
+                tenant_id,
                 code,
                 is_assignable,
                 own_schema_version,
@@ -156,6 +169,7 @@ public sealed class ActivateProductIntegrationTests(
                 created_by)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 {productTypeCode},
                 TRUE,
                 0,
@@ -168,11 +182,13 @@ public sealed class ActivateProductIntegrationTests(
             $"""
             INSERT INTO catalog.product_type_effective_schema (
                 product_type_id,
+                tenant_id,
                 effective_schema_version,
                 schema,
                 updated_at_utc)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 42,
                 CAST({schemaJson} AS jsonb),
                 CURRENT_TIMESTAMP);
@@ -190,6 +206,7 @@ public sealed class ActivateProductIntegrationTests(
             ]);
 
         Product product = Product.Create(
+            tenantId,
             name,
             Money.Create(100m, "USD"),
             ProductTypeId.From(productTypeId),

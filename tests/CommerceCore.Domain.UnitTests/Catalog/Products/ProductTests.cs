@@ -8,11 +8,13 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Events;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.UnitTests.Catalog.Products;
 
 public class ProductTests
 {
+    private static readonly TenantId TestTenantId = TenantId.New();
     private static readonly DateTimeOffset TestTime = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
 
     private static LocalizedText CreateValidName(string text = "Test məhsulu") => 
@@ -22,10 +24,23 @@ public class ProductTests
 
     private static Product CreateValidProduct() =>
         Product.Create(
+            TestTenantId,
             CreateValidName(),
             CreateValidPrice(),
             ProductTypeId.New(),
             TestTime);
+
+    [Fact]
+    public void Create_WithEmptyTenantId_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Product.Create(
+                default,
+                CreateValidName(),
+                CreateValidPrice(),
+                ProductTypeId.New(),
+                TestTime));
+    }
 
     private static Product CreateProductWithActiveVariant()
     {

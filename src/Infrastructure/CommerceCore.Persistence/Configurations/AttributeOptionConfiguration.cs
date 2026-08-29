@@ -1,5 +1,6 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -19,6 +20,16 @@ public sealed class AttributeOptionConfiguration : IEntityTypeConfiguration<Attr
                 id => id.Value,
                 value => AttributeOptionId.From(value))
             .ValueGeneratedNever();
+
+        builder.Property(option => option.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
+
+        builder.HasAlternateKey(option => new { option.TenantId, option.Id })
+            .HasName("ux_attribute_options_tenant_id_id");
 
         builder.Property(option => option.AttributeDefinitionId)
             .HasColumnName("attribute_definition_id")
@@ -46,18 +57,20 @@ public sealed class AttributeOptionConfiguration : IEntityTypeConfiguration<Attr
 
         builder.HasIndex(option => new
         {
+            option.TenantId,
             option.AttributeDefinitionId,
             option.Code
         })
             .IsUnique()
-            .HasDatabaseName("ux_attribute_options_definition_code");
+            .HasDatabaseName("ux_attribute_options_tenant_definition_code");
 
         builder.HasIndex(option => new
         {
+            option.TenantId,
             option.AttributeDefinitionId,
             option.DisplayOrder
         })
             .IsUnique()
-            .HasDatabaseName("ux_attribute_options_definition_display_order");
+            .HasDatabaseName("ux_attribute_options_tenant_definition_display_order");
     }
 }

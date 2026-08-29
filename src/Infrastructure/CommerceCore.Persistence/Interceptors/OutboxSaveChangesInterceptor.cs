@@ -1,16 +1,20 @@
+using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Common.Events;
 using CommerceCore.Persistence.Outbox;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Text.Json;
 
 namespace CommerceCore.Persistence.Interceptors;
 
-public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
+public sealed class OutboxSaveChangesInterceptor(ITenantContext? tenantContext = null) : SaveChangesInterceptor
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly ITenantContext? _tenantContext = tenantContext;
 
-    private static void AddOutboxMessages(DbContext? dbContext)
+    private void AddOutboxMessages(DbContext? dbContext)
     {
         if (dbContext is null)
             return;
@@ -23,7 +27,7 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
 
         IDomainEvent[] domainEvents = [.. agregates.SelectMany(agregates => agregates.DomainEvents)];
 
-        if(domainEvents.Length == 0)
+        if (domainEvents.Length == 0)
             return;
 
         HashSet<Guid> existingOutboxMessageIds = [.. dbContext.ChangeTracker
@@ -31,15 +35,28 @@ public sealed class OutboxSaveChangesInterceptor : SaveChangesInterceptor
                .Where(entry => entry.State != EntityState.Detached)
                .Select(entry => entry.Entity.Id)];
 
-        foreach (var domainEvent in domainEvents)
-        {
-            if (!existingOutboxMessageIds.Add(domainEvent.EventId))
-                continue;
+        Guid currentTenantId = _tenantContext?.TenantId?.Value ?? Guid.Empty;
 
-            dbContext.Set<OutboxMessage>().Add(
-                OutboxMessage.Create(
-                    domainEvent,
-                    JsonOptions));
+        foreach (var aggregate in agregates)
+        {
+            Guid aggregateTenantId = currentTenantId;
+            if (aggregateTenantId == Guid.Empty)
+            {
+                if (aggregate is Product product) aggregateTenantId = product.TenantId.Value;
+                else if (aggregate is ProductType productType) aggregateTenantId = productType.TenantId.Value;
+            }
+
+            foreach (var domainEvent in aggregate.DomainEvents)
+            {
+                if (!existingOutboxMessageIds.Add(domainEvent.EventId))
+                    continue;
+
+                dbContext.Set<OutboxMessage>().Add(
+                    OutboxMessage.Create(
+                        domainEvent,
+                        aggregateTenantId,
+                        JsonOptions));
+            }
         }
     }
 

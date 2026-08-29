@@ -1,7 +1,8 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,18 +17,24 @@ public sealed class ProductTypePersistenceIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using var scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
         ProductType root = ProductType.CreateRoot(
+            tenantId,
             ProductTypeCode.Create("electronics"));
 
         dbContext.ProductTypes.Add(root);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         ProductType child = ProductType.CreateChild(
+            tenantId,
             root.Id,
             ProductTypeCode.Create("gaming_laptop"));
 

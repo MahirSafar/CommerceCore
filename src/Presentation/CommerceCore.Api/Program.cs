@@ -11,6 +11,8 @@ using CommerceCore.Application.Common.Behaviors;
 using CommerceCore.Infrastructure.Common.Time;
 using CommerceCore.Persistence;
 
+using CommerceCore.Platform.Identity;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ValidateConfiguration();
@@ -31,6 +33,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddPlatformTenantServices();
 
 builder.Services.AddApplication();
 builder.Services.AddMediator(options =>
@@ -57,6 +60,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+app.UsePlatformTenantResolution();
 app.UseRateLimiter();
 app.UseAuthorization();
 
