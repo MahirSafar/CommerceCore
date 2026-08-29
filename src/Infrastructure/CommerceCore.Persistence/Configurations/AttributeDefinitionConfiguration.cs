@@ -1,5 +1,6 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -27,6 +28,16 @@ public sealed class AttributeDefinitionConfiguration : IEntityTypeConfiguration<
                 id => id.Value,
                 value => AttributeDefinitionId.From(value))
             .ValueGeneratedNever();
+
+        builder.Property(definition => definition.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
+
+        builder.HasAlternateKey(definition => new { definition.TenantId, definition.Id })
+            .HasName("ux_attribute_definitions_tenant_id_id");
 
         builder.Property(definition => definition.ProductTypeId)
             .HasColumnName("product_type_id")
@@ -93,9 +104,17 @@ public sealed class AttributeDefinitionConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(MeasurementUnitFamily.MaximumLength)
             .HasConversion(NullableMeasurementUnitFamilyConverter);
 
+        builder.HasOne<ProductType>()
+            .WithMany(productType => productType.AttributeDefinitions)
+            .HasPrincipalKey(productType => new { productType.TenantId, productType.Id })
+            .HasForeignKey(definition => new { definition.TenantId, definition.ProductTypeId })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_attribute_definitions_product_type");
+
         builder.HasMany(definition => definition.Options)
             .WithOne()
-            .HasForeignKey(option => option.AttributeDefinitionId)
+            .HasPrincipalKey(definition => new { definition.TenantId, definition.Id })
+            .HasForeignKey(option => new { option.TenantId, option.AttributeDefinitionId })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_attribute_options_attribute_definition");
 
@@ -104,18 +123,20 @@ public sealed class AttributeDefinitionConfiguration : IEntityTypeConfiguration<
 
         builder.HasIndex(definition => new
         {
+            definition.TenantId,
             definition.ProductTypeId,
             definition.Key
         })
             .IsUnique()
-            .HasDatabaseName("ux_attribute_definitions_product_type_key");
+            .HasDatabaseName("ux_attribute_definitions_tenant_product_type_key");
 
         builder.HasIndex(definition => new
         {
+            definition.TenantId,
             definition.ProductTypeId,
             definition.DisplayOrder
         })
             .IsUnique()
-            .HasDatabaseName("ux_attribute_definitions_product_type_display_order");
+            .HasDatabaseName("ux_attribute_definitions_tenant_product_type_display_order");
     }
 }

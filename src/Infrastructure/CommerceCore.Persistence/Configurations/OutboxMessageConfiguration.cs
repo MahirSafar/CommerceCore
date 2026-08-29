@@ -1,4 +1,4 @@
-﻿using CommerceCore.Persistence.Outbox;
+using CommerceCore.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -15,6 +15,10 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
         builder.Property(message => message.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();
+
+        builder.Property(message => message.TenantId)
+            .HasColumnName("tenant_id")
+            .IsRequired();
 
         builder.Property(message => message.OccurredOnUtc)
             .HasColumnName("occurred_on_utc")
@@ -44,8 +48,8 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
             .HasColumnName("last_error")
             .HasColumnType("text");
 
-        builder.HasIndex(message => message.OccurredOnUtc)
-            .HasDatabaseName("ix_messages_pending_occurred_on_utc")
+        builder.HasIndex(message => new { message.TenantId, message.OccurredOnUtc })
+            .HasDatabaseName("ix_outbox_messages_tenant_pending_occurred_on_utc")
             .HasFilter("\"processed_on_utc\" IS NULL");
     }
 }

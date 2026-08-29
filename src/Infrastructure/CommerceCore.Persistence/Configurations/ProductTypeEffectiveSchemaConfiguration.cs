@@ -1,6 +1,7 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.ProductTypes;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,7 +15,14 @@ public sealed class ProductTypeEffectiveSchemaConfiguration : IEntityTypeConfigu
             "product_type_effective_schema",
             schema: "catalog");
 
-        builder.HasKey(schema => schema.ProductTypeId);
+        builder.HasKey(schema => new { schema.TenantId, schema.ProductTypeId });
+
+        builder.Property(schema => schema.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
 
         builder.Property(schema => schema.ProductTypeId)
             .HasColumnName("product_type_id")
@@ -42,8 +50,9 @@ public sealed class ProductTypeEffectiveSchemaConfiguration : IEntityTypeConfigu
 
         builder.HasOne<ProductType>()
             .WithOne()
+            .HasPrincipalKey<ProductType>(productType => new { productType.TenantId, productType.Id })
             .HasForeignKey<ProductTypeEffectiveSchema>(
-                schema => schema.ProductTypeId)
+                schema => new { schema.TenantId, schema.ProductTypeId })
             .OnDelete(DeleteBehavior.Cascade)
             .HasConstraintName(
                 "fk_product_type_effective_schema_product_type");

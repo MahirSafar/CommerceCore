@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
@@ -11,6 +11,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\CommerceCore.Application\CommerceCore.Application.csproj" />
     <ProjectReference Include="..\..\Core\CommerceCore.Domain\CommerceCore.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Domain\CommerceCore.Modules.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Application\CommerceCore.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
+    <ProjectReference Include="..\..\Platform\CommerceCore.Platform.ControlPlane\CommerceCore.Platform.ControlPlane.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

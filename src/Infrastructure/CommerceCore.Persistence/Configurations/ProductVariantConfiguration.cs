@@ -1,8 +1,9 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Persistence.Serialization;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -41,6 +42,16 @@ public sealed class ProductVariantConfiguration
                 id => id.Value,
                 value => ProductVariantId.From(value))
             .ValueGeneratedNever();
+
+        builder.Property(variant => variant.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
+
+        builder.HasAlternateKey(variant => new { variant.TenantId, variant.Id })
+            .HasName("ux_product_variants_tenant_id_id");
 
         builder.Property<ProductId>("ProductId")
             .HasColumnName("product_id")
@@ -106,19 +117,19 @@ public sealed class ProductVariantConfiguration
         builder.Navigation(variant => variant.Price)
             .IsRequired();
 
-        builder.HasIndex(variant => variant.Sku)
+        builder.HasIndex(variant => new { variant.TenantId, variant.Sku })
             .IsUnique()
-            .HasDatabaseName("ux_product_variants_sku");
+            .HasDatabaseName("ux_product_variants_tenant_sku");
 
-        builder.HasIndex("ProductId", nameof(ProductVariant.Options))
+        builder.HasIndex(nameof(ProductVariant.TenantId), "ProductId", nameof(ProductVariant.Options))
             .IsUnique()
             .HasDatabaseName(
-                "ux_product_variants_product_id_options");
+                "ux_product_variants_tenant_product_id_options");
 
-        builder.HasIndex("ProductId")
+        builder.HasIndex(nameof(ProductVariant.TenantId), "ProductId")
             .IsUnique()
             .HasFilter("\"is_default\" = TRUE")
             .HasDatabaseName(
-                "ux_product_variants_default_per_product");
+                "ux_product_variants_tenant_default_per_product");
     }
 }

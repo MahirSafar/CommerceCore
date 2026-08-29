@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -282,11 +282,13 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
             transaction,
             """
             INSERT INTO catalog.product_type_effective_schema (
+                tenant_id,
                 product_type_id,
                 effective_schema_version,
                 schema,
                 updated_at_utc)
             SELECT
+                target.tenant_id,
                 target.id,
                 @schema_revision,
                 jsonb_build_object(
@@ -350,11 +352,9 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
                                     definition.minimum_length,
                                     definition.maximum_length,
                                     definition.measurement_unit_family
-                                FROM catalog.product_types AS schema_owner
-                                INNER JOIN catalog.attribute_definitions
-                                    AS definition
-                                    ON definition.product_type_id =
-                                        schema_owner.id
+                                FROM catalog.attribute_definitions AS definition
+                                INNER JOIN catalog.product_types AS schema_owner
+                                    ON schema_owner.id = definition.product_type_id
                                 WHERE schema_owner.path @> target.path
                                 ORDER BY
                                     definition.key,
@@ -366,7 +366,7 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
                 CURRENT_TIMESTAMP
             FROM catalog.product_types AS target
             WHERE target.id = ANY(@product_type_ids)
-            ON CONFLICT (product_type_id)
+            ON CONFLICT (tenant_id, product_type_id)
             DO UPDATE SET
                 effective_schema_version = EXCLUDED.effective_schema_version,
                 schema = EXCLUDED.schema,

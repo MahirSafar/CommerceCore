@@ -1,5 +1,6 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -25,6 +26,16 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
                 id => id.Value,
                 value => ProductTypeId.From(value))
             .ValueGeneratedNever();
+
+        builder.Property(productType => productType.TenantId)
+            .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
+            .IsRequired();
+
+        builder.HasAlternateKey(productType => new { productType.TenantId, productType.Id })
+            .HasName("ux_product_types_tenant_id_id");
 
         builder.Property(productType => productType.Code)
             .HasColumnName("code")
@@ -91,15 +102,15 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
         builder.Navigation(productType => productType.AttributeDefinitions)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
-        builder.HasIndex(productType => productType.Code)
+        builder.HasIndex(productType => new { productType.TenantId, productType.Code })
             .IsUnique()
-            .HasDatabaseName("ux_product_types_code");
+            .HasDatabaseName("ux_product_types_tenant_code");
 
         builder.HasIndex("path")
             .HasMethod("gist")
             .HasDatabaseName("ix_product_types_path_gist");
 
-        builder.HasIndex(productType => productType.ParentProductTypeId)
-            .HasDatabaseName("ix_product_types_parent_product_type_id");
+        builder.HasIndex(productType => new { productType.TenantId, productType.ParentProductTypeId })
+            .HasDatabaseName("ix_product_types_tenant_parent_product_type_id");
     }
 }

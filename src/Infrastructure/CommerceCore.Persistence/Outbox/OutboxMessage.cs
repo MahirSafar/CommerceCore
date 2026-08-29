@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Common.Events;
+using CommerceCore.Domain.Common.Events;
 using System.Text.Json;
 
 namespace CommerceCore.Persistence.Outbox;
@@ -11,16 +11,20 @@ public sealed class OutboxMessage
 
     private OutboxMessage(
         Guid id,
+        Guid tenantId,
         DateTimeOffset occurredOnUtc,
         string type,
         string content)
     {
         Id = id;
+        TenantId = tenantId;
         OccurredOnUtc = occurredOnUtc;
         Type = type;
         Content = content;
     }
+
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public DateTimeOffset OccurredOnUtc { get; private set; }
     public string Type { get; private set; } = null!;
     public string Content { get; private set; } = null!;
@@ -30,6 +34,7 @@ public sealed class OutboxMessage
 
     public static OutboxMessage Create(
         IDomainEvent domainEvent,
+        Guid tenantId,
         JsonSerializerOptions serializerOptions)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
@@ -41,7 +46,14 @@ public sealed class OutboxMessage
 
         return new OutboxMessage(
             domainEvent.EventId,
+            tenantId,
             domainEvent.OccurredOnUtc,
-            eventType.FullName ?? eventType.Name, content);
+            eventType.FullName ?? eventType.Name,
+            content);
     }
+
+    public static OutboxMessage Create(
+        IDomainEvent domainEvent,
+        JsonSerializerOptions serializerOptions)
+        => Create(domainEvent, Guid.Empty, serializerOptions);
 }

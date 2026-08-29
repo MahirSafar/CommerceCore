@@ -1,6 +1,9 @@
 using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Persistence.ControlPlane;
 using CommerceCore.Persistence.Interceptors;
 using CommerceCore.Persistence.ProductTypes;
+using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,10 +17,13 @@ public static class DependencyInjection
 
         services.AddScoped<AuditingSaveChangesInterceptor>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
+        services.AddScoped<TenantSessionInterceptor>();
 
         services.AddScoped<IProductTypeSchemaCoordinator, ProductTypeSchemaCoordinator>();
         services.AddScoped<IProductTypeEffectiveSchemaReader, ProductTypeEffectiveSchemaReader>();
         services.AddScoped<IAttributeDefinitionRegistry, AttributeDefinitionRegistry>();
+        services.AddScoped<IPlatformTenantStore, PlatformTenantStore>();
+
         services.AddDbContext<CommerceCoreDbContext>(
             (serviceProvider, options) =>
             {
@@ -37,9 +43,13 @@ public static class DependencyInjection
                 OutboxSaveChangesInterceptor outboxInterceptor =
                     serviceProvider.GetRequiredService<OutboxSaveChangesInterceptor>();
 
+                TenantSessionInterceptor tenantSessionInterceptor =
+                    serviceProvider.GetRequiredService<TenantSessionInterceptor>();
+
                 options.AddInterceptors(
                     auditingInterceptor,
-                    outboxInterceptor);
+                    outboxInterceptor,
+                    tenantSessionInterceptor);
             });
 
         services.AddScoped<ICommerceCoreDbContext>(serviceProvider => serviceProvider.GetRequiredService<CommerceCoreDbContext>());
