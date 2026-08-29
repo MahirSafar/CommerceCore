@@ -7,7 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Core\CommerceCore.Domain\CommerceCore.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

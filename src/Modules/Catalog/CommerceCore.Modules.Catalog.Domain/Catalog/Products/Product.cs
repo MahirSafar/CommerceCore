@@ -7,6 +7,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Platform.Contracts;
 using System.Collections.ObjectModel;
 
 namespace CommerceCore.Domain.Catalog.Products;
@@ -18,6 +19,8 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
     private readonly List<ProductVariant> _variants = [];
 
     private readonly ReadOnlyCollection<ProductVariant> _readOnlyVariants;
+
+    public TenantId TenantId { get; private set; }
 
     public LocalizedText Name { get; private set; } = null!;
 
@@ -40,6 +43,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
     private Product(
         ProductId id,
+        TenantId tenantId,
         LocalizedText name,
         Money price,
         ProductTypeId productTypeId)
@@ -52,6 +56,14 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
                 nameof(productTypeId));
         }
 
+        if (tenantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Tenant ID cannot be empty.",
+                nameof(tenantId));
+        }
+
+        TenantId = tenantId;
         Name = name;
         Price = price;
         ProductTypeId = productTypeId;
@@ -62,11 +74,12 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
     }
 
     public static Product Create(
-      LocalizedText name,
-      Money price,
-      ProductTypeId productTypeId,
-      DateTimeOffset createdAtUtc)
-    { 
+        TenantId tenantId,
+        LocalizedText name,
+        Money price,
+        ProductTypeId productTypeId,
+        DateTimeOffset createdAtUtc)
+    {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(price);
 
@@ -81,6 +94,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
 
         Product product = new(
             ProductId.New(),
+            tenantId,
             name,
             price,
             productTypeId);
@@ -231,6 +245,7 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
         }
 
         ProductVariant variant = ProductVariant.Create(
+            TenantId,
             sku,
             price,
             options,

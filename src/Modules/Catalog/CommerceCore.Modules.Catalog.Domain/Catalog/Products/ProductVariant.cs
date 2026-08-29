@@ -1,26 +1,38 @@
-﻿using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
 using CommerceCore.Domain.Common.ValueObjects;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.Catalog.Products;
 
 public sealed class ProductVariant : BaseEntity<ProductVariantId>
 {
+    public TenantId TenantId { get; private set; }
+
     private ProductVariant()
     {
     }
 
     private ProductVariant(
         ProductVariantId id,
+        TenantId tenantId,
         VariantSku sku,
         Money price,
         AttributeValueBag options,
         bool isDefault)
         : base(id)
     {
+        if (tenantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Tenant ID cannot be empty.",
+                nameof(tenantId));
+        }
+
+        TenantId = tenantId;
         Sku = sku;
         Price = price;
         Options = options;
@@ -40,6 +52,7 @@ public sealed class ProductVariant : BaseEntity<ProductVariantId>
     public ProductVariantStatus Status { get; private set; }
 
     internal static ProductVariant Create(
+        TenantId tenantId,
         VariantSku sku,
         Money price,
         AttributeValueBag options,
@@ -50,6 +63,7 @@ public sealed class ProductVariant : BaseEntity<ProductVariantId>
 
         return new ProductVariant(
             ProductVariantId.New(),
+            tenantId,
             sku,
             price,
             options,

@@ -3,6 +3,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.Catalog.ProductTypes;
 
@@ -11,11 +12,14 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
     private readonly List<AttributeDefinition> _attributeDefinitions = [];
     private readonly ReadOnlyCollection<AttributeDefinition> _readOnlyAttributeDefinitions;
 
+    public TenantId TenantId { get; private set; }
+
     private ProductType() =>
         _readOnlyAttributeDefinitions = _attributeDefinitions.AsReadOnly();
 
     private ProductType(
         ProductTypeId id,
+        TenantId tenantId,
         ProductTypeCode code,
         ProductTypeId? parentProductTypeId,
         bool isAssignable)
@@ -29,6 +33,14 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
                 nameof(parentProductTypeId));
         }
 
+        if (tenantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Tenant ID cannot be empty.",
+                nameof(tenantId));
+        }
+
+        TenantId = tenantId;
         _readOnlyAttributeDefinitions = _attributeDefinitions.AsReadOnly();
 
         Code = code;
@@ -49,16 +61,18 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
         _readOnlyAttributeDefinitions;
 
     public static ProductType CreateRoot(
+        TenantId tenantId,
         ProductTypeCode code,
         bool isAssignable = false) =>
         new(
             ProductTypeId.New(),
+            tenantId,
             code,
             parentProductTypeId: null,
             isAssignable);
 
-
     public static ProductType CreateChild(
+        TenantId tenantId,
         ProductTypeId parentProductTypeId,
         ProductTypeCode code,
         bool isAssignable = true) => parentProductTypeId.Value == Guid.Empty
@@ -67,10 +81,10 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
                 nameof(parentProductTypeId))
             : new ProductType(
                 ProductTypeId.New(),
+                tenantId,
                 code,
                 parentProductTypeId,
                 isAssignable);
-    
 
     public bool EnableAssignments()
     {
@@ -117,6 +131,7 @@ public sealed class ProductType : AggregateRoot<ProductTypeId>
         }
 
         AttributeDefinition definition = AttributeDefinition.Create(
+            TenantId,
             Id,
             key,
             dataType,

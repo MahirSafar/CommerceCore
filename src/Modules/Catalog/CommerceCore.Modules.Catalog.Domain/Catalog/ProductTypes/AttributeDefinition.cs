@@ -1,8 +1,9 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.Entities;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.Catalog.ProductTypes;
 
@@ -11,10 +12,13 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
     private readonly List<AttributeOption> _options = [];
     private readonly ReadOnlyCollection<AttributeOption> _readOnlyOptions;
 
+    public TenantId TenantId { get; private set; }
+
     private AttributeDefinition() => _readOnlyOptions = _options.AsReadOnly();
 
     private AttributeDefinition(
         AttributeDefinitionId id,
+        TenantId tenantId,
         ProductTypeId productTypeId,
         AttributeKey key,
         AttributeDataType dataType,
@@ -30,6 +34,15 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
     {
         if (productTypeId.Value == Guid.Empty)
             throw new ArgumentException("Product type ID cannot be empty.", nameof(productTypeId));
+
+        if (tenantId.Value == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "Tenant ID cannot be empty.",
+                nameof(tenantId));
+        }
+
+        TenantId = tenantId;
 
         ValidateDisplayOrder(displayOrder);
 
@@ -91,6 +104,7 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
     public IReadOnlyCollection<AttributeOption> Options => _readOnlyOptions;
 
     public static AttributeDefinition Create(
+        TenantId tenantId,
         ProductTypeId productTypeId,
         AttributeKey key,
         AttributeDataType dataType,
@@ -105,6 +119,7 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
     {
         return new AttributeDefinition(
             AttributeDefinitionId.New(),
+            tenantId,
             productTypeId,
             key,
             dataType,
@@ -140,7 +155,7 @@ public sealed class AttributeDefinition : BaseEntity<AttributeDefinitionId>
                 $"Display order '{displayOrder}' is already used by an option of attribute '{Key}'.");
         }
 
-        AttributeOption option = AttributeOption.Create(Id, code, displayOrder);
+        AttributeOption option = AttributeOption.Create(TenantId, Id, code, displayOrder);
         _options.Add(option);
 
         return option;

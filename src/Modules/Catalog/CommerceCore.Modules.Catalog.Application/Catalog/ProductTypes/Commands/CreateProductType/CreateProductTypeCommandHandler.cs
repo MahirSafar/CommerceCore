@@ -1,7 +1,8 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,12 +10,13 @@ namespace CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductTy
 
 public sealed class CreateProductTypeCommandHandler(
     ICommerceCoreDbContext dbContext,
-    IProductTypeSchemaCoordinator schemaCoordinator)
+    IProductTypeSchemaCoordinator schemaCoordinator,
+    ITenantContext tenantContext)
     : ICommandHandler<CreateProductTypeCommand, CreateProductTypeResult>
 {
     private readonly ICommerceCoreDbContext _dbContext = dbContext;
-    private readonly IProductTypeSchemaCoordinator _schemaCoordinator =
-        schemaCoordinator;
+    private readonly IProductTypeSchemaCoordinator _schemaCoordinator = schemaCoordinator;
+    private readonly ITenantContext _tenantContext = tenantContext;
 
     public async ValueTask<CreateProductTypeResult> Handle(
         CreateProductTypeCommand command,
@@ -35,6 +37,9 @@ public sealed class CreateProductTypeCommandHandler(
         }
 
         ProductType productType;
+        TenantId tenantId = _tenantContext.TenantId
+            ?? throw new InvalidOperationException(
+                "A resolved tenant context is required.");
 
         if (command.ParentProductTypeId is Guid parentProductTypeGuid)
         {
@@ -54,6 +59,7 @@ public sealed class CreateProductTypeCommandHandler(
             }
 
             productType = ProductType.CreateChild(
+                tenantId,
                 parentProductTypeId,
                 code,
                 command.IsAssignable);
@@ -61,6 +67,7 @@ public sealed class CreateProductTypeCommandHandler(
         else
         {
             productType = ProductType.CreateRoot(
+                tenantId,
                 code,
                 command.IsAssignable);
         }
