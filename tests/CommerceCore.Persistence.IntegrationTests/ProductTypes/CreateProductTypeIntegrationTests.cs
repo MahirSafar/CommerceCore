@@ -6,6 +6,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Persistence.ProductTypes;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,8 @@ public sealed class CreateProductTypeIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        fixture.SetTenantForCurrentTest();
+
         await using var scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
@@ -28,7 +31,13 @@ public sealed class CreateProductTypeIntegrationTests(
         IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
             .GetRequiredService<IProductTypeSchemaCoordinator>();
 
-        CreateProductTypeCommandHandler handler = new(dbContext, schemaCoordinator);
+        ITenantContext tenantContext = scope.ServiceProvider
+            .GetRequiredService<ITenantContext>();
+
+        CreateProductTypeCommandHandler handler = new(
+            dbContext,
+            schemaCoordinator,
+            tenantContext);
 
         CreateProductTypeResult rootResult = await handler.Handle(
             new CreateProductTypeCommand(
@@ -82,6 +91,8 @@ public sealed class CreateProductTypeIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
@@ -90,7 +101,13 @@ public sealed class CreateProductTypeIntegrationTests(
         IProductTypeSchemaCoordinator schemaCoordinator = scope.ServiceProvider
             .GetRequiredService<IProductTypeSchemaCoordinator>();
 
-        CreateProductTypeCommandHandler handler = new(dbContext, schemaCoordinator);
+        ITenantContext tenantContext = scope.ServiceProvider
+            .GetRequiredService<ITenantContext>();
+
+        CreateProductTypeCommandHandler handler = new(
+            dbContext,
+            schemaCoordinator,
+            tenantContext);
 
         ProductTypeDomainException exception = await Assert.ThrowsAsync<ProductTypeDomainException>(
             () => handler.Handle(

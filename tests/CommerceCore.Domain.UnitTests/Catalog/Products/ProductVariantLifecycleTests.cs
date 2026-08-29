@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
@@ -6,6 +6,7 @@ using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.UnitTests.Catalog.Products;
 
@@ -98,6 +99,7 @@ public sealed class ProductVariantLifecycleTests
             ]);
 
         return Product.Create(
+            TenantId.New(),
             name,
             Money.Create(100m, "USD"),
             ProductTypeId.New(),

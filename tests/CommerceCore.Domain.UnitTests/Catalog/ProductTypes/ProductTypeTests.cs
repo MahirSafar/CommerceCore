@@ -2,17 +2,43 @@ using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.UnitTests.Catalog.ProductTypes;
 
 public sealed class ProductTypeTests
 {
+    private static readonly TenantId TestTenantId = TenantId.New();
+
+    [Fact]
+    public void CreateRoot_WithEmptyTenantId_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            ProductType.CreateRoot(
+                default,
+                ProductTypeCode.Create("electronics")));
+    }
+
+    [Fact]
+    public void CreateChild_WithEmptyTenantId_ThrowsArgumentException()
+    {
+        ProductTypeId parentId = ProductTypeId.New();
+
+        Assert.Throws<ArgumentException>(() =>
+            ProductType.CreateChild(
+                default,
+                parentId,
+                ProductTypeCode.Create("gaming_laptop")));
+    }
+
     [Fact]
     public void CreateRoot_CreatesNonAssignableRootWithoutParent()
     {
         ProductType productType = ProductType.CreateRoot(
+            TestTenantId,
             ProductTypeCode.Create("electronics"));
 
+        Assert.Equal(TestTenantId, productType.TenantId);
         Assert.Equal("electronics", productType.Code.Value);
         Assert.Null(productType.ParentProductTypeId);
         Assert.False(productType.IsAssignable);
@@ -25,9 +51,11 @@ public sealed class ProductTypeTests
         ProductTypeId parentId = ProductTypeId.New();
 
         ProductType productType = ProductType.CreateChild(
+            TestTenantId,
             parentId,
             ProductTypeCode.Create("gaming_laptop"));
 
+        Assert.Equal(TestTenantId, productType.TenantId);
         Assert.Equal(parentId, productType.ParentProductTypeId);
         Assert.True(productType.IsAssignable);
     }
@@ -145,6 +173,7 @@ public sealed class ProductTypeTests
     public void DisableAssignments_IsIdempotent()
     {
         ProductType productType = ProductType.CreateRoot(
+            TestTenantId,
             ProductTypeCode.Create("coffee"),
             isAssignable: true);
 
@@ -155,6 +184,7 @@ public sealed class ProductTypeTests
 
     private static ProductType CreateProductType() =>
         ProductType.CreateRoot(
+            TestTenantId,
             ProductTypeCode.Create("laptop"),
             isAssignable: true);
 }

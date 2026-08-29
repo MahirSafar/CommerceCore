@@ -1,12 +1,27 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Platform.Contracts;
 
 namespace CommerceCore.Domain.UnitTests.Catalog.ProductTypes;
 
 public sealed class AttributeDefinitionTests
 {
+    [Fact]
+    public void Create_EmptyTenantId_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            AttributeDefinition.Create(
+                default,
+                ProductTypeId.New(),
+                AttributeKey.Create("sample_attribute"),
+                AttributeDataType.Text,
+                AttributeScope.ProductSpecification,
+                isRequired: false,
+                displayOrder: 0));
+    }
+
     [Fact]
     public void Create_RequiredAttribute_StartsInDraft()
     {
@@ -191,6 +206,7 @@ public sealed class AttributeDefinitionTests
         MeasurementUnitFamily? measurementUnitFamily = null)
     {
         return AttributeDefinition.Create(
+            TenantId.New(),
             ProductTypeId.New(),
             AttributeKey.Create("sample_attribute"),
             dataType,

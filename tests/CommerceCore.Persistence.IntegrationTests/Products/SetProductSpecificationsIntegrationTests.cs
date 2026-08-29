@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
@@ -8,6 +8,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -32,7 +35,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         IProductTypeEffectiveSchemaReader schemaReader =
             scope.ServiceProvider.GetRequiredService<
@@ -86,6 +90,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -95,6 +101,7 @@ public sealed class SetProductSpecificationsIntegrationTests(
         Product product = await SeedProductAsync(
             dbContext,
             cancellationToken,
+            tenantId,
             CreateMassMeasurementSchemaJson());
 
         IProductTypeEffectiveSchemaReader schemaReader =
@@ -154,6 +161,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -163,6 +172,7 @@ public sealed class SetProductSpecificationsIntegrationTests(
         Product product = await SeedProductAsync(
             dbContext,
             cancellationToken,
+            tenantId,
             CreateMassMeasurementSchemaJson());
 
         IProductTypeEffectiveSchemaReader schemaReader =
@@ -215,6 +225,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -223,7 +235,8 @@ public sealed class SetProductSpecificationsIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         IProductTypeEffectiveSchemaReader schemaReader =
             scope.ServiceProvider.GetRequiredService<
@@ -286,9 +299,10 @@ public sealed class SetProductSpecificationsIntegrationTests(
     }
     """;
 
-    private static async Task<Product> SeedProductAsync(
+    private async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
         CancellationToken cancellationToken,
+        TenantId tenantId,
         string? schemaJson = null)
     {
         Guid productTypeId = Guid.NewGuid();
@@ -323,6 +337,7 @@ public sealed class SetProductSpecificationsIntegrationTests(
             $"""
             INSERT INTO catalog.product_types (
                 id,
+                tenant_id,
                 code,
                 is_assignable,
                 own_schema_version,
@@ -330,6 +345,7 @@ public sealed class SetProductSpecificationsIntegrationTests(
                 created_by)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 {productTypeCode},
                 TRUE,
                 0,
@@ -342,11 +358,13 @@ public sealed class SetProductSpecificationsIntegrationTests(
             $"""
             INSERT INTO catalog.product_type_effective_schema (
                 product_type_id,
+                tenant_id,
                 effective_schema_version,
                 schema,
                 updated_at_utc)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 42,
                 CAST({schemaJson} AS jsonb),
                 CURRENT_TIMESTAMP);
@@ -364,6 +382,7 @@ public sealed class SetProductSpecificationsIntegrationTests(
             ]);
 
         Product product = Product.Create(
+            tenantId,
             name,
             Money.Create(100m, "USD"),
             ProductTypeId.From(productTypeId),

@@ -1,8 +1,11 @@
 using CommerceCore.Application.Catalog.Products.Queries.GetProductById;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CommerceCore.Persistence.IntegrationTests.Products;
@@ -15,11 +18,23 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using var scope = fixture.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        var product = CreateProduct();
+        var productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var product = CreateProduct(tenantId, productType.Id);
 
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -46,11 +61,23 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using var scope = fixture.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        var product = CreateProduct();
+        var productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var product = CreateProduct(tenantId, productType.Id);
 
         Assert.True(product.Archive(
             new DateTimeOffset(2026, 8, 15, 17, 0, 0, TimeSpan.Zero),
@@ -68,7 +95,7 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
         Assert.Null(result);
     }
 
-    private static Product CreateProduct()
+    private static Product CreateProduct(TenantId tenantId, ProductTypeId productTypeId)
     {
         var defaultLanguage = LanguageCode.Create("az");
 
@@ -84,9 +111,10 @@ public sealed class GetProductByIdIntegrationTests(PostgreSqlFixture fixture)
             ]);
 
         return Product.Create(
+            tenantId,
             name,
             Money.Create(149.99m, "USD"),
-            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
+            productTypeId,
             new DateTimeOffset(2026, 8, 15, 17, 0, 0, TimeSpan.Zero));
     }
 }

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
@@ -34,6 +34,12 @@
 		<ProjectReference Include="..\..\Core\CommerceCore.Application\CommerceCore.Application.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\CommerceCore.Infrastructure\CommerceCore.Infrastructure.csproj" />
 		<ProjectReference Include="..\..\Infrastructure\CommerceCore.Persistence\CommerceCore.Persistence.csproj" />
+		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Domain\CommerceCore.Modules.Catalog.Domain.csproj" />
+		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Application\CommerceCore.Modules.Catalog.Application.csproj" />
+		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Infrastructure\CommerceCore.Modules.Catalog.Infrastructure.csproj" />
+		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
+		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.ControlPlane\CommerceCore.Platform.ControlPlane.csproj" />
+		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.Identity\CommerceCore.Platform.Identity.csproj" />
 	</ItemGroup>
 
 </Project>

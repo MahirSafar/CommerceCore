@@ -1,8 +1,11 @@
 using CommerceCore.Application.Catalog.Products.Commands.ChangeProductPrice;
 using CommerceCore.Domain.Catalog.Products;
+using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,12 +20,24 @@ public sealed class ChangeProductPriceIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
+        TenantId tenantId = TenantId.New();
+        var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantId);
+
         await using var scope = fixture.Services.CreateAsyncScope();
 
         CommerceCoreDbContext dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();
 
-        Product product = CreateProduct();
+        ProductType productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        Product product = CreateProduct(tenantId, productType.Id);
 
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -55,7 +70,7 @@ public sealed class ChangeProductPriceIntegrationTests(
         Assert.Equal("integration-test", persistedProduct.UpdatedBy);
     }
 
-    private static Product CreateProduct()
+    private static Product CreateProduct(TenantId tenantId, ProductTypeId productTypeId)
     {
         LanguageCode language = LanguageCode.Create("en");
 
@@ -68,9 +83,10 @@ public sealed class ChangeProductPriceIntegrationTests(
             ]);
 
         return Product.Create(
+            tenantId,
             name,
             Money.Create(100m, "USD"),
-            SeededCatalogIds.LegacyUnclassifiedProductTypeId,
+            productTypeId,
             new DateTimeOffset(2026, 8, 16, 9, 0, 0, TimeSpan.Zero));
     }
 }

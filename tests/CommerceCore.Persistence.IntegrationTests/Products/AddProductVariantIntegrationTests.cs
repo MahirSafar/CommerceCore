@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.ActivateProductVariant;
+using CommerceCore.Application.Catalog.Products.Commands.ActivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.AddProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.DeactivateProductVariant;
 using CommerceCore.Application.Catalog.Products.Commands.SetProductDefaultVariant;
@@ -13,6 +13,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
+using CommerceCore.Platform.Contracts;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +30,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -37,7 +40,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantCommandHandler handler = CreateHandler(
             scope.ServiceProvider,
@@ -81,6 +85,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -89,7 +95,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantCommandHandler handler = CreateHandler(
             scope.ServiceProvider,
@@ -128,6 +135,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -136,7 +145,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantCommandHandler addHandler = CreateHandler(
             scope.ServiceProvider,
@@ -199,6 +209,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -207,7 +219,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantCommandHandler addHandler = CreateHandler(
             scope.ServiceProvider,
@@ -264,6 +277,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -272,7 +287,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantResult added = await CreateHandler(
             scope.ServiceProvider,
@@ -317,6 +333,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -325,7 +343,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantResult added = await CreateHandler(
             scope.ServiceProvider,
@@ -378,6 +397,8 @@ public sealed class AddProductVariantIntegrationTests(
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
 
+        TenantId tenantId = fixture.SetTenantForCurrentTest();
+
         await using AsyncServiceScope scope =
             fixture.Services.CreateAsyncScope();
 
@@ -386,7 +407,8 @@ public sealed class AddProductVariantIntegrationTests(
 
         Product product = await SeedProductAsync(
             dbContext,
-            cancellationToken);
+            cancellationToken,
+            tenantId);
 
         AddProductVariantResult added = await CreateHandler(
             scope.ServiceProvider,
@@ -446,8 +468,6 @@ public sealed class AddProductVariantIntegrationTests(
             Assert.Single(persistedProduct.Variants).Status);
     }
 
-
-
     private static AddProductVariantCommandHandler CreateHandler(
         IServiceProvider services,
         CommerceCoreDbContext dbContext) =>
@@ -481,9 +501,10 @@ public sealed class AddProductVariantIntegrationTests(
         CommerceCoreDbContext dbContext) =>
         new(dbContext);
 
-    private static async Task<Product> SeedProductAsync(
+    private async Task<Product> SeedProductAsync(
         CommerceCoreDbContext dbContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TenantId tenantId)
     {
         Guid productTypeId = Guid.NewGuid();
 
@@ -491,6 +512,7 @@ public sealed class AddProductVariantIntegrationTests(
             $"""
             INSERT INTO catalog.product_types (
                 id,
+                tenant_id,
                 code,
                 is_assignable,
                 own_schema_version,
@@ -498,6 +520,7 @@ public sealed class AddProductVariantIntegrationTests(
                 created_by)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 {$"variant_test_{Guid.NewGuid():N}"},
                 TRUE,
                 0,
@@ -547,11 +570,13 @@ public sealed class AddProductVariantIntegrationTests(
             $"""
             INSERT INTO catalog.product_type_effective_schema (
                 product_type_id,
+                tenant_id,
                 effective_schema_version,
                 schema,
                 updated_at_utc)
             VALUES (
                 {productTypeId},
+                {tenantId.Value},
                 1,
                 CAST({schemaJson} AS jsonb),
                 CURRENT_TIMESTAMP);
@@ -569,6 +594,7 @@ public sealed class AddProductVariantIntegrationTests(
             ]);
 
         Product product = Product.Create(
+            tenantId,
             name,
             Money.Create(1000m, "USD"),
             ProductTypeId.From(productTypeId),
