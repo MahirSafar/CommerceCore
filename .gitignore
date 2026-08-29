@@ -80,3 +80,13 @@ ehthumbs.db
 .env
 .env.*
 !.env.example
+
+# Test Results
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+
+# Local Documentation & Blueprints (Not tracked in repository)
+docs/
+infra/
+CommerceCoreRoadmap.md
