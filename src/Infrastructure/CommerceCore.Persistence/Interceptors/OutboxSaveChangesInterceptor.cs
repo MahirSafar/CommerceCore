@@ -9,10 +9,10 @@ using System.Text.Json;
 
 namespace CommerceCore.Persistence.Interceptors;
 
-public sealed class OutboxSaveChangesInterceptor(ITenantContext? tenantContext = null) : SaveChangesInterceptor
+public sealed class OutboxSaveChangesInterceptor(ITenantContext tenantContext) : SaveChangesInterceptor
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly ITenantContext? _tenantContext = tenantContext;
+    private readonly ITenantContext _tenantContext = tenantContext;
 
     private void AddOutboxMessages(DbContext? dbContext)
     {
@@ -35,16 +35,18 @@ public sealed class OutboxSaveChangesInterceptor(ITenantContext? tenantContext =
                .Where(entry => entry.State != EntityState.Detached)
                .Select(entry => entry.Entity.Id)];
 
-        Guid currentTenantId = _tenantContext?.TenantId?.Value ?? Guid.Empty;
+        TenantId? currentTenantId = _tenantContext.TenantId;
 
         foreach (var aggregate in agregates)
         {
-            Guid aggregateTenantId = currentTenantId;
-            if (aggregateTenantId == Guid.Empty)
-            {
-                if (aggregate is Product product) aggregateTenantId = product.TenantId.Value;
-                else if (aggregate is ProductType productType) aggregateTenantId = productType.TenantId.Value;
-            }
+            TenantId aggregateTenantId = currentTenantId
+                ?? aggregate switch
+                {
+                    Product product => product.TenantId,
+                    ProductType productType => productType.TenantId,
+                    _ => throw new InvalidOperationException(
+                        $"Outbox event source '{aggregate.GetType().Name}' must have a tenant.")
+                };
 
             foreach (var domainEvent in aggregate.DomainEvents)
             {

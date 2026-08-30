@@ -1,3 +1,4 @@
+using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -14,6 +15,9 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
 
         builder.Property(membership => membership.TenantId)
             .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
             .IsRequired();
 
         builder.Property(membership => membership.UserSubject)

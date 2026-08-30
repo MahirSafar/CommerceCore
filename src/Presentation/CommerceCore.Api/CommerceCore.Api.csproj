@@ -18,16 +18,11 @@
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol"
-                  Version="1.18.0" />
-		<PackageReference Include="OpenTelemetry.Extensions.Hosting"
-						  Version="1.18.0" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore"
-						  Version="1.18.0" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.Http"
-						  Version="1.18.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"
-                  Version="10.0.11" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -36,7 +31,6 @@
 		<ProjectReference Include="..\..\Infrastructure\CommerceCore.Persistence\CommerceCore.Persistence.csproj" />
 		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Domain\CommerceCore.Modules.Catalog.Domain.csproj" />
 		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Application\CommerceCore.Modules.Catalog.Application.csproj" />
-		<ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Infrastructure\CommerceCore.Modules.Catalog.Infrastructure.csproj" />
 		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.Contracts\CommerceCore.Platform.Contracts.csproj" />
 		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.ControlPlane\CommerceCore.Platform.ControlPlane.csproj" />
 		<ProjectReference Include="..\..\Platform\CommerceCore.Platform.Identity\CommerceCore.Platform.Identity.csproj" />

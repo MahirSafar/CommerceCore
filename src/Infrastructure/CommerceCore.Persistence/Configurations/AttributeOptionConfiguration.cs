@@ -1,6 +1,7 @@
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,7 +11,15 @@ public sealed class AttributeOptionConfiguration : IEntityTypeConfiguration<Attr
 {
     public void Configure(EntityTypeBuilder<AttributeOption> builder)
     {
-        builder.ToTable("attribute_options", schema: "catalog");
+        builder.ToTable(
+            "attribute_options",
+            "catalog",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_attribute_options_display_order_nonnegative",
+                    "\"display_order\" >= 0");
+            });
 
         builder.HasKey(option => option.Id);
 
@@ -27,6 +36,12 @@ public sealed class AttributeOptionConfiguration : IEntityTypeConfiguration<Attr
                 id => id.Value,
                 value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_attribute_options_tenant");
 
         builder.HasAlternateKey(option => new { option.TenantId, option.Id })
             .HasName("ux_attribute_options_tenant_id_id");

@@ -1,6 +1,6 @@
 ﻿using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 
-namespace CommerceCore.Application.Common.Abstractions.Persistence;
+namespace CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 
 public interface IProductTypeSchemaCoordinator
 {

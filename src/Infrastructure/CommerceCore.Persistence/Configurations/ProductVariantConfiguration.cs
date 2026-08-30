@@ -4,6 +4,7 @@ using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Persistence.Serialization;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -49,6 +50,12 @@ public sealed class ProductVariantConfiguration
                 id => id.Value,
                 value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_variants_tenant");
 
         builder.HasAlternateKey(variant => new { variant.TenantId, variant.Id })
             .HasName("ux_product_variants_tenant_id_id");

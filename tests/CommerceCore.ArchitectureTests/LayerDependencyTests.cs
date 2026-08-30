@@ -20,6 +20,9 @@ public sealed class LayerDependencyTests
     private static readonly Assembly CatalogDomainAssembly =
         LoadAssembly("CommerceCore.Modules.Catalog.Domain");
 
+    private static readonly Assembly CatalogApplicationAssembly =
+        LoadAssembly("CommerceCore.Modules.Catalog.Application");
+
     private static readonly Assembly PlatformContractsAssembly =
         LoadAssembly("CommerceCore.Platform.Contracts");
 
@@ -79,6 +82,30 @@ public sealed class LayerDependencyTests
             "CommerceCore.Infrastructure",
             "CommerceCore.Api",
             "Microsoft.AspNetCore");
+    }
+
+    [Fact]
+    public void Application_Must_Not_Depend_On_Catalog_Or_Platform()
+    {
+        AssertHasNoDependencyOn(
+            ApplicationAssembly,
+            "CommerceCore.Modules.Catalog.Domain",
+            "CommerceCore.Modules.Catalog.Application",
+            "CommerceCore.Platform.Contracts",
+            "CommerceCore.Platform.ControlPlane",
+            "CommerceCore.Platform.Identity");
+    }
+
+    [Fact]
+    public void CatalogApplication_Must_Not_Depend_On_Implementation_Layers()
+    {
+        AssertHasNoDependencyOn(
+            CatalogApplicationAssembly,
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "Microsoft.AspNetCore",
+            "Npgsql");
     }
 
     [Fact]

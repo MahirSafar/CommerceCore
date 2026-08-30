@@ -5,6 +5,7 @@ using CommerceCore.Api.Endpoints.V1.Products;
 using CommerceCore.Api.Endpoints.V1.ProductTypes;
 using CommerceCore.Api.Identity;
 using CommerceCore.Application;
+using CommerceCore.Application.Catalog;
 using CommerceCore.Application.Catalog.Products.Commands.CreateProduct;
 using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Application.Common.Behaviors;
@@ -35,7 +36,7 @@ builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddPlatformTenantServices();
 
-builder.Services.AddApplication();
+builder.Services.AddCatalogApplication();
 builder.Services.AddMediator(options =>
 {
     options.Assemblies = [typeof(CreateProductCommand)];

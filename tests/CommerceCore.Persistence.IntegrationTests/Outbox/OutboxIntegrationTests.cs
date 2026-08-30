@@ -20,13 +20,12 @@ public sealed class OutboxIntegrationTests(
     [Fact]
     public async Task SaveChanges_WhenProductIsCreated_WritesOutboxMessage()
     {
-        TenantId tenantId = TenantId.New();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        TenantId tenantId = await fixture.CreateTenantAsync(cancellationToken);
         var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantId);
 
         await using var scope = fixture.Services.CreateAsyncScope();
-
-        var cancellationToken = TestContext.Current.CancellationToken;
 
         var dbContext = scope.ServiceProvider
             .GetRequiredService<CommerceCoreDbContext>();

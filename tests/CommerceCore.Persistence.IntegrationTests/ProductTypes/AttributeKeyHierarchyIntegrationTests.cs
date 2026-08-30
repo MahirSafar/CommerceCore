@@ -1,8 +1,8 @@
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.DefineAttribute;
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Platform.Contracts;
 using Microsoft.Extensions.DependencyInjection;

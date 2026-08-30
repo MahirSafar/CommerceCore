@@ -22,7 +22,7 @@ public sealed class RestoreProductIntegrationTests(
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
-        TenantId tenantId = TenantId.New();
+        TenantId tenantId = await fixture.CreateTenantAsync(cancellationToken);
         var tenantContext = fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantId);
 

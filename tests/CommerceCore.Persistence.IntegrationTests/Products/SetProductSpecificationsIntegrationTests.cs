@@ -1,5 +1,4 @@
 using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
@@ -7,6 +6,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Platform.Contracts;
 using FluentValidation;

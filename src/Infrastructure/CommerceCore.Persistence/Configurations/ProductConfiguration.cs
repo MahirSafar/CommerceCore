@@ -6,6 +6,7 @@ using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
 using CommerceCore.Persistence.Serialization;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -51,7 +52,19 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
     public void Configure(EntityTypeBuilder<Product> builder)
     {
-        builder.ToTable("products", schema: "catalog");
+        builder.ToTable(
+            "products",
+            "catalog",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_products_specifications_is_object",
+                    "jsonb_typeof(\"specifications\") = 'object'");
+
+                table.HasCheckConstraint(
+                    "ck_products_specifications_key_count",
+                    "catalog.jsonb_key_count(\"specifications\") <= 50");
+            });
 
         builder.HasKey(product => product.Id);
 
@@ -68,6 +81,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
                 id => id.Value,
                 value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_products_tenant");
 
         builder.HasAlternateKey(product => new { product.TenantId, product.Id })
             .HasName("ux_products_tenant_id_id");

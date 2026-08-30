@@ -1,5 +1,4 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
-using CommerceCore.Domain.Catalog.Attributes.Services;
+﻿using CommerceCore.Domain.Catalog.Attributes.Services;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
@@ -7,6 +6,7 @@ using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using FluentValidation;
 using FluentValidation.Results;
 using Mediator;

@@ -1,6 +1,6 @@
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.Outbox;
 using CommerceCore.Persistence.ProductTypes;
 using CommerceCore.Platform.ControlPlane.Entities;

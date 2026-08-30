@@ -25,7 +25,7 @@ public sealed class TenantResolutionMiddlewareTests
         var storefront = new Storefront
         {
             Id = storefrontId,
-            TenantId = tenantId,
+            TenantId = TenantId.From(tenantId),
             HostName = "store1.example.com",
             MarketCode = "AZ",
             DefaultLocale = "az-AZ",
@@ -94,7 +94,7 @@ public sealed class TenantResolutionMiddlewareTests
         var tenantId = Guid.NewGuid();
         var membership = new TenantMembership
         {
-            TenantId = tenantId,
+            TenantId = TenantId.From(tenantId),
             UserSubject = userSub,
             Role = "Admin",
             Status = "Active"
@@ -156,12 +156,15 @@ public sealed class TenantResolutionMiddlewareTests
         // Arrange
         var context = new DefaultHttpContext();
         context.Request.Path = "/api/partner/products";
-        context.Request.Headers["X-Partner-Client-Id"] = "partner-erp-client";
+        context.User = new ClaimsPrincipal(
+            new ClaimsIdentity(
+                [new Claim("client_id", "partner-erp-client")],
+                "Bearer"));
 
         var tenantId = Guid.NewGuid();
         var tenant = new Tenant
         {
-            Id = tenantId,
+            Id = TenantId.From(tenantId),
             Slug = "partner-erp-client",
             Name = "Partner Tenant",
             Status = "Active"
@@ -186,5 +189,57 @@ public sealed class TenantResolutionMiddlewareTests
         Assert.NotNull(resolved);
         Assert.True(resolved.IsResolved);
         Assert.Equal(tenantId, resolved.TenantId?.Value);
+    }
+
+    [Fact]
+    public async Task Partner_Route_Rejects_Client_Id_From_Untrusted_Header()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/partner/products";
+        context.Request.Headers["X-Partner-Client-Id"] = "partner-erp-client";
+
+        var nextCalled = false;
+
+        var middleware = new TenantResolutionMiddleware(ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+
+        await _tenantStore.DidNotReceive()
+            .GetTenantByPartnerClientIdAsync(
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Api_Route_Returns_400_When_Tenant_Cannot_Be_Resolved()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/products";
+        context.Request.Host = new HostString("unknown.example.com");
+
+        _tenantStore.GetStorefrontByHostAsync(
+                "unknown.example.com",
+                Arg.Any<CancellationToken>())
+            .Returns((Storefront?)null);
+
+        var nextCalled = false;
+
+        var middleware = new TenantResolutionMiddleware(ctx =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
     }
 }
