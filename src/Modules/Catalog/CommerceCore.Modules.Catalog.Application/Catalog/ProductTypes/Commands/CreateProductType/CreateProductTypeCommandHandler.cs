@@ -1,7 +1,7 @@
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Platform.Contracts;
 using Mediator;
 using Microsoft.EntityFrameworkCore;

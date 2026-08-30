@@ -1,6 +1,8 @@
 using CommerceCore.Application;
+using CommerceCore.Application.Catalog;
 using CommerceCore.Application.Common.Abstractions;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -16,14 +18,41 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         .WithPassword("TestPassword123!")
         .Build();
 
+    private DbContextOptions<CommerceCoreDbContext> _adminDbContextOptions = null!;
+
+    public TenantId PrimaryTenantId { get; } = TenantId.New();
+
+    public TenantId SecondaryTenantId { get; } = TenantId.New();
+
     public IServiceProvider Services { get; private set; } = null!;
 
     public TenantId SetTenantForCurrentTest()
     {
-        TenantId tenantId = TenantId.New();
+        TenantId tenantId = PrimaryTenantId;
 
         Services.GetRequiredService<TestTenantContext>()
             .SetTenant(tenantId);
+
+        return tenantId;
+    }
+
+    public async Task<TenantId> CreateTenantAsync(
+        CancellationToken cancellationToken)
+    {
+        TenantId tenantId = TenantId.New();
+
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        dbContext.Tenants.Add(new Tenant
+        {
+            Id = tenantId,
+            Slug = $"integration-{tenantId.Value:N}",
+            Name = "Integration Test Tenant",
+            Status = "Active"
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return tenantId;
     }
@@ -38,9 +67,29 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             .UseNpgsql(adminConnectionString)
             .Options;
 
+        _adminDbContextOptions = migrationOptions;
+
         await using (var migrationDb = new CommerceCoreDbContext(migrationOptions))
         {
             await migrationDb.Database.MigrateAsync();
+
+            migrationDb.Tenants.AddRange(
+                new Tenant
+                {
+                    Id = PrimaryTenantId,
+                    Slug = "integration-primary",
+                    Name = "Integration Primary Tenant",
+                    Status = "Active"
+                },
+                new Tenant
+                {
+                    Id = SecondaryTenantId,
+                    Slug = "integration-secondary",
+                    Name = "Integration Secondary Tenant",
+                    Status = "Active"
+                });
+
+            await migrationDb.SaveChangesAsync();
         }
 
         await using (var adminConnection = new NpgsqlConnection(adminConnectionString))
@@ -87,7 +136,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
         services.AddPersistence(applicationConnectionString);
         
-        services.AddApplication();
+        services.AddCatalogApplication();
 
         Services = services.BuildServiceProvider();
     }

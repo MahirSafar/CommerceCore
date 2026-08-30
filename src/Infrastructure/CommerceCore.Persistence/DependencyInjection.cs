@@ -1,4 +1,4 @@
-using CommerceCore.Application.Common.Abstractions.Persistence;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.ControlPlane;
 using CommerceCore.Persistence.Interceptors;
 using CommerceCore.Persistence.ProductTypes;

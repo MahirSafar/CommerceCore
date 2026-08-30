@@ -18,7 +18,7 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
     {
         return await _dbContext.Set<Tenant>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == tenantId.Value, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
     }
 
     public async Task<Storefront?> GetStorefrontByHostAsync(string hostName, CancellationToken cancellationToken = default)

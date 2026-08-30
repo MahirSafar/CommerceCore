@@ -1,6 +1,7 @@
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -18,7 +19,82 @@ public sealed class AttributeDefinitionConfiguration : IEntityTypeConfiguration<
 
     public void Configure(EntityTypeBuilder<AttributeDefinition> builder)
     {
-        builder.ToTable("attribute_definitions", schema: "catalog");
+        builder.ToTable(
+            "attribute_definitions",
+            "catalog",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_display_order_nonnegative",
+                    "\"display_order\" >= 0");
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_numeric_range",
+                    """
+                    "minimum_value" IS NULL
+                    OR "maximum_value" IS NULL
+                    OR "minimum_value" <= "maximum_value"
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_numeric_type",
+                    """
+                    "data_type" IN ('Integer', 'Decimal', 'Measurement')
+                    OR ("minimum_value" IS NULL AND "maximum_value" IS NULL)
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_integer_range",
+                    """
+                    "data_type" <> 'Integer'
+                    OR (
+                        ("minimum_value" IS NULL OR trunc("minimum_value") = "minimum_value")
+                        AND ("maximum_value" IS NULL OR trunc("maximum_value") = "maximum_value")
+                    )
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_text_length",
+                    """
+                    "data_type" = 'Text'
+                    OR ("minimum_length" IS NULL AND "maximum_length" IS NULL)
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_length_range",
+                    """
+                    ("minimum_length" IS NULL OR "minimum_length" >= 0)
+                    AND ("maximum_length" IS NULL OR "maximum_length" >= 0)
+                    AND (
+                        "minimum_length" IS NULL
+                        OR "maximum_length" IS NULL
+                        OR "minimum_length" <= "maximum_length"
+                    )
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_measurement_unit_family",
+                    """
+                    (
+                        "data_type" = 'Measurement'
+                        AND "measurement_unit_family" IS NOT NULL
+                    )
+                    OR (
+                        "data_type" <> 'Measurement'
+                        AND "measurement_unit_family" IS NULL
+                    )
+                    """);
+
+                table.HasCheckConstraint(
+                    "ck_attribute_definitions_enforcement_status",
+                    """
+                    "enforcement_status" IN ('Draft', 'Backfilling', 'Enforced')
+                    AND (
+                        "is_required"
+                        OR "enforcement_status" = 'Enforced'
+                    )
+                    """);
+            });
 
         builder.HasKey(definition => definition.Id);
 
@@ -35,6 +111,12 @@ public sealed class AttributeDefinitionConfiguration : IEntityTypeConfiguration<
                 id => id.Value,
                 value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_attribute_definitions_tenant");
 
         builder.HasAlternateKey(definition => new { definition.TenantId, definition.Id })
             .HasName("ux_attribute_definitions_tenant_id_id");

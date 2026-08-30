@@ -30,6 +30,13 @@ public sealed class HttpTenantContext(IHttpContextAccessor httpContextAccessor) 
     public string? DefaultLocale => CurrentContext.DefaultLocale;
     public bool IsResolved => CurrentContext.IsResolved;
 
+    public static bool HasResolvedTenant(HttpContext httpContext)
+    {
+        return httpContext.Items.TryGetValue(ItemKey, out var item)
+            && item is ITenantContext tenantContext
+            && tenantContext.IsResolved;
+    }
+
     public static void SetContext(HttpContext httpContext, ITenantContext context)
     {
         httpContext.Items[ItemKey] = context;

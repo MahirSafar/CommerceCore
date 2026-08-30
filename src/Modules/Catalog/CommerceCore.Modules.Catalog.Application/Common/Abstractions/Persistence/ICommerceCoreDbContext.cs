@@ -2,7 +2,7 @@
 using CommerceCore.Domain.Catalog.ProductTypes;
 using Microsoft.EntityFrameworkCore;
 
-namespace CommerceCore.Application.Common.Abstractions.Persistence;
+namespace CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 
 public interface ICommerceCoreDbContext
 {

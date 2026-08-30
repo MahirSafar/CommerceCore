@@ -1,5 +1,4 @@
 using CommerceCore.Application.Common.Abstractions;
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Application.Common.Factories;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
@@ -7,6 +6,7 @@ using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Platform.Contracts;
 using Mediator;
 using Microsoft.EntityFrameworkCore;

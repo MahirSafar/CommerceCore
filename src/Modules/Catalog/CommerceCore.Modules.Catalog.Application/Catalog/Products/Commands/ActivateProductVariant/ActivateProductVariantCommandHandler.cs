@@ -1,7 +1,7 @@
-﻿using CommerceCore.Application.Common.Abstractions.Persistence;
-using CommerceCore.Domain.Catalog.Products;
+﻿using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.Schema;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using FluentValidation;
 using FluentValidation.Results;
 using Mediator;

@@ -35,7 +35,7 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange
-        TenantId tenantA = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantA);
 
@@ -67,8 +67,8 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange: Create Product in Tenant A
-        TenantId tenantA = TenantId.New();
-        TenantId tenantB = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
+        TenantId tenantB = _fixture.SecondaryTenantId;
 
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantA);
@@ -111,8 +111,8 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange
-        TenantId tenantA = TenantId.New();
-        TenantId tenantB = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
+        TenantId tenantB = _fixture.SecondaryTenantId;
 
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantA);
@@ -175,7 +175,7 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange: Create Product in Tenant A
-        TenantId tenantA = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantA);
 
@@ -213,8 +213,8 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange
-        TenantId tenantA = TenantId.New();
-        TenantId tenantB = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
+        TenantId tenantB = _fixture.SecondaryTenantId;
 
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
 
@@ -256,7 +256,7 @@ public sealed class TenantRlsIntegrationTests
             TestContext.Current.CancellationToken;
 
         // Arrange
-        TenantId tenantA = TenantId.New();
+        TenantId tenantA = _fixture.PrimaryTenantId;
         var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
         tenantContext.SetTenant(tenantA);
 
@@ -276,9 +276,62 @@ public sealed class TenantRlsIntegrationTests
 
         // Assert: Outbox messages must have TenantId of Tenant A
         var outboxMessage = await db.OutboxMessages.FirstOrDefaultAsync(
-            m => m.TenantId == tenantA.Value,
+            m => m.TenantId == tenantA,
             cancellationToken);
         Assert.NotNull(outboxMessage);
-        Assert.Equal(tenantA.Value, outboxMessage.TenantId);
+        Assert.Equal(tenantA, outboxMessage.TenantId);
+    }
+
+    [Fact]
+    public async Task Rls_TenantA_Cannot_Link_ProductType_To_TenantB_Parent()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        TenantId tenantA = _fixture.PrimaryTenantId;
+        TenantId tenantB = _fixture.SecondaryTenantId;
+
+        var tenantContext = _fixture.Services
+            .GetRequiredService<TestTenantContext>();
+
+        tenantContext.SetTenant(tenantB);
+
+        ProductTypeId tenantBRootId;
+
+        await using (var scopeB = _fixture.Services.CreateAsyncScope())
+        {
+            var dbB = scopeB.ServiceProvider
+                .GetRequiredService<CommerceCoreDbContext>();
+
+            var tenantBRoot = ProductType.CreateRoot(
+                tenantB,
+                ProductTypeCode.Create(
+                    $"tenant_b_root_{Guid.NewGuid():N}"));
+
+            dbB.ProductTypes.Add(tenantBRoot);
+
+            await dbB.SaveChangesAsync(cancellationToken);
+
+            tenantBRootId = tenantBRoot.Id;
+        }
+
+        tenantContext.SetTenant(tenantA);
+
+        await using (var scopeA = _fixture.Services.CreateAsyncScope())
+        {
+            var dbA = scopeA.ServiceProvider
+                .GetRequiredService<CommerceCoreDbContext>();
+
+            var illegalChild = ProductType.CreateChild(
+                tenantA,
+                tenantBRootId,
+                ProductTypeCode.Create(
+                    $"tenant_a_child_{Guid.NewGuid():N}"));
+
+            dbA.ProductTypes.Add(illegalChild);
+
+            await Assert.ThrowsAnyAsync<DbUpdateException>(
+                () => dbA.SaveChangesAsync(cancellationToken));
+        }
     }
 }

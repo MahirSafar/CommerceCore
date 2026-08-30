@@ -113,7 +113,24 @@ namespace CommerceCore.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_attribute_definitions_tenant_product_type_key");
 
-                    b.ToTable("attribute_definitions", "catalog");
+                    b.ToTable("attribute_definitions", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_attribute_definitions_display_order_nonnegative", "\"display_order\" >= 0");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_enforcement_status", "\"enforcement_status\" IN ('Draft', 'Backfilling', 'Enforced')\nAND (\n    \"is_required\"\n    OR \"enforcement_status\" = 'Enforced'\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_integer_range", "\"data_type\" <> 'Integer'\nOR (\n    (\"minimum_value\" IS NULL OR trunc(\"minimum_value\") = \"minimum_value\")\n    AND (\"maximum_value\" IS NULL OR trunc(\"maximum_value\") = \"maximum_value\")\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_length_range", "(\"minimum_length\" IS NULL OR \"minimum_length\" >= 0)\nAND (\"maximum_length\" IS NULL OR \"maximum_length\" >= 0)\nAND (\n    \"minimum_length\" IS NULL\n    OR \"maximum_length\" IS NULL\n    OR \"minimum_length\" <= \"maximum_length\"\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_measurement_unit_family", "(\n    \"data_type\" = 'Measurement'\n    AND \"measurement_unit_family\" IS NOT NULL\n)\nOR (\n    \"data_type\" <> 'Measurement'\n    AND \"measurement_unit_family\" IS NULL\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_numeric_range", "\"minimum_value\" IS NULL\nOR \"maximum_value\" IS NULL\nOR \"minimum_value\" <= \"maximum_value\"");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_numeric_type", "\"data_type\" IN ('Integer', 'Decimal', 'Measurement')\nOR (\"minimum_value\" IS NULL AND \"maximum_value\" IS NULL)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_text_length", "\"data_type\" = 'Text'\nOR (\"minimum_length\" IS NULL AND \"maximum_length\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeOption", b =>
@@ -159,7 +176,10 @@ namespace CommerceCore.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_attribute_options_tenant_definition_display_order");
 
-                    b.ToTable("attribute_options", "catalog");
+                    b.ToTable("attribute_options", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_attribute_options_display_order_nonnegative", "\"display_order\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.ProductType", b =>
@@ -229,8 +249,6 @@ namespace CommerceCore.Persistence.Migrations
                     b.HasAlternateKey("TenantId", "Id")
                         .HasName("ux_product_types_tenant_id_id");
 
-                    b.HasIndex("ParentProductTypeId");
-
                     b.HasIndex("path")
                         .HasDatabaseName("ix_product_types_path_gist");
 
@@ -243,7 +261,10 @@ namespace CommerceCore.Persistence.Migrations
                     b.HasIndex("TenantId", "ParentProductTypeId")
                         .HasDatabaseName("ix_product_types_tenant_parent_product_type_id");
 
-                    b.ToTable("product_types", "catalog");
+                    b.ToTable("product_types", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_types_own_schema_version_nonnegative", "\"own_schema_version\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.Product", b =>
@@ -335,7 +356,12 @@ namespace CommerceCore.Persistence.Migrations
                     b.HasIndex("TenantId", "Status", "IsDeleted")
                         .HasDatabaseName("ix_products_tenant_status_is_deleted");
 
-                    b.ToTable("products", "catalog");
+                    b.ToTable("products", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_products_specifications_is_object", "jsonb_typeof(\"specifications\") = 'object'");
+
+                            t.HasCheckConstraint("ck_products_specifications_key_count", "catalog.jsonb_key_count(\"specifications\") <= 50");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.ProductVariant", b =>
@@ -483,7 +509,10 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("TenantId", "ProductTypeId");
 
-                    b.ToTable("product_type_effective_schema", "catalog");
+                    b.ToTable("product_type_effective_schema", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_type_effective_schema_effective_version_nonnegative", "\"effective_schema_version\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.Storefront", b =>
@@ -605,10 +634,24 @@ namespace CommerceCore.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_attribute_definitions_product_type");
+
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attribute_definitions_tenant");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeOption", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attribute_options_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.AttributeDefinition", null)
                         .WithMany("Options")
                         .HasForeignKey("TenantId", "AttributeDefinitionId")
@@ -620,15 +663,30 @@ namespace CommerceCore.Persistence.Migrations
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.ProductType", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_types_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithMany()
-                        .HasForeignKey("ParentProductTypeId")
+                        .HasForeignKey("TenantId", "ParentProductTypeId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_types_parent_product_type");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.Product", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_products_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithMany()
                         .HasForeignKey("TenantId", "ProductTypeId")
@@ -670,6 +728,13 @@ namespace CommerceCore.Persistence.Migrations
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.ProductVariant", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_variants_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.Products.Product", null)
                         .WithMany("Variants")
                         .HasForeignKey("TenantId", "ProductId")
@@ -709,8 +774,25 @@ namespace CommerceCore.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("CommerceCore.Persistence.Outbox.OutboxMessage", b =>
+                {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_outbox_messages_tenant");
+                });
+
             modelBuilder.Entity("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_type_effective_schema_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithOne()
                         .HasForeignKey("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", "TenantId", "ProductTypeId")

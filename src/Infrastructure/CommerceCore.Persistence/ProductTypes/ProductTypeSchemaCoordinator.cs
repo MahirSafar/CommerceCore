@@ -1,5 +1,5 @@
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;

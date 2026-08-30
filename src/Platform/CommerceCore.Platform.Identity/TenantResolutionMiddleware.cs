@@ -38,7 +38,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             }
 
             var tenantContext = TenantContext.ForTenant(
-                TenantId.From(storefront.TenantId),
+                storefront.TenantId,
                 storefront.StorefrontId,
                 storefront.MarketId,
                 storefront.DefaultLocale);
@@ -70,13 +70,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            var tenantContext = TenantContext.ForTenant(membership.StronglyTypedTenantId);
+            var tenantContext = TenantContext.ForTenant(membership.TenantId);
             HttpTenantContext.SetContext(context, tenantContext);
         }
         else if (path.StartsWith("/api/partner"))
         {
-            var clientId = context.Request.Headers["X-Partner-Client-Id"].FirstOrDefault()
-                ?? context.User.FindFirst("client_id")?.Value;
+            var clientId = context.User.FindFirst("client_id")?.Value;
 
             if (string.IsNullOrWhiteSpace(clientId))
             {
@@ -98,7 +97,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            var tenantContext = TenantContext.ForTenant(tenant.TenantId);
+            var tenantContext = TenantContext.ForTenant(tenant.Id);
             HttpTenantContext.SetContext(context, tenantContext);
         }
         else
@@ -109,7 +108,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             if (storefront is not null && storefront.IsActive)
             {
                 var tenantContext = TenantContext.ForTenant(
-                    TenantId.From(storefront.TenantId),
+                    storefront.TenantId,
                     storefront.StorefrontId,
                     storefront.MarketId,
                     storefront.DefaultLocale);
@@ -126,11 +125,24 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                     var membership = await tenantStore.GetMembershipByUserSubjectAsync(userSub, context.RequestAborted);
                     if (membership is not null && membership.Status == "Active")
                     {
-                        var tenantContext = TenantContext.ForTenant(membership.StronglyTypedTenantId);
+                        var tenantContext = TenantContext.ForTenant(membership.TenantId);
                         HttpTenantContext.SetContext(context, tenantContext);
                     }
                 }
             }
+        }
+
+        if (!HttpTenantContext.HasResolvedTenant(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                Title = "Tenant Resolution Required",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "The request could not be associated with an active tenant."
+            });
+
+            return;
         }
 
         await _next(context);

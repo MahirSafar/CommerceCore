@@ -1,4 +1,6 @@
 using CommerceCore.Persistence.Outbox;
+using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -18,7 +20,16 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
 
         builder.Property(message => message.TenantId)
             .HasColumnName("tenant_id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_outbox_messages_tenant");
 
         builder.Property(message => message.OccurredOnUtc)
             .HasColumnName("occurred_on_utc")

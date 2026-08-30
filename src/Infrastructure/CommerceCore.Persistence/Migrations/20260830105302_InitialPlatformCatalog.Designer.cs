@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CommerceCore.Persistence.Migrations
 {
     [DbContext(typeof(CommerceCoreDbContext))]
-    [Migration("20260823233213_AddProductVariants")]
-    partial class AddProductVariants
+    [Migration("20260830105302_InitialPlatformCatalog")]
+    partial class InitialPlatformCatalog
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -97,17 +97,43 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("scope");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductTypeId", "DisplayOrder")
-                        .IsUnique()
-                        .HasDatabaseName("ux_attribute_definitions_product_type_display_order");
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ux_attribute_definitions_tenant_id_id");
 
-                    b.HasIndex("ProductTypeId", "Key")
-                        .IsUnique()
-                        .HasDatabaseName("ux_attribute_definitions_product_type_key");
+                    b.HasIndex("ProductTypeId");
 
-                    b.ToTable("attribute_definitions", "catalog");
+                    b.HasIndex("TenantId", "ProductTypeId", "DisplayOrder")
+                        .IsUnique()
+                        .HasDatabaseName("ux_attribute_definitions_tenant_product_type_display_order");
+
+                    b.HasIndex("TenantId", "ProductTypeId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ux_attribute_definitions_tenant_product_type_key");
+
+                    b.ToTable("attribute_definitions", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_attribute_definitions_display_order_nonnegative", "\"display_order\" >= 0");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_enforcement_status", "\"enforcement_status\" IN ('Draft', 'Backfilling', 'Enforced')\nAND (\n    \"is_required\"\n    OR \"enforcement_status\" = 'Enforced'\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_integer_range", "\"data_type\" <> 'Integer'\nOR (\n    (\"minimum_value\" IS NULL OR trunc(\"minimum_value\") = \"minimum_value\")\n    AND (\"maximum_value\" IS NULL OR trunc(\"maximum_value\") = \"maximum_value\")\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_length_range", "(\"minimum_length\" IS NULL OR \"minimum_length\" >= 0)\nAND (\"maximum_length\" IS NULL OR \"maximum_length\" >= 0)\nAND (\n    \"minimum_length\" IS NULL\n    OR \"maximum_length\" IS NULL\n    OR \"minimum_length\" <= \"maximum_length\"\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_measurement_unit_family", "(\n    \"data_type\" = 'Measurement'\n    AND \"measurement_unit_family\" IS NOT NULL\n)\nOR (\n    \"data_type\" <> 'Measurement'\n    AND \"measurement_unit_family\" IS NULL\n)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_numeric_range", "\"minimum_value\" IS NULL\nOR \"maximum_value\" IS NULL\nOR \"minimum_value\" <= \"maximum_value\"");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_numeric_type", "\"data_type\" IN ('Integer', 'Decimal', 'Measurement')\nOR (\"minimum_value\" IS NULL AND \"maximum_value\" IS NULL)");
+
+                            t.HasCheckConstraint("ck_attribute_definitions_text_length", "\"data_type\" = 'Text'\nOR (\"minimum_length\" IS NULL AND \"maximum_length\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeOption", b =>
@@ -136,17 +162,27 @@ namespace CommerceCore.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deprecated");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("AttributeDefinitionId", "Code")
-                        .IsUnique()
-                        .HasDatabaseName("ux_attribute_options_definition_code");
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ux_attribute_options_tenant_id_id");
 
-                    b.HasIndex("AttributeDefinitionId", "DisplayOrder")
+                    b.HasIndex("TenantId", "AttributeDefinitionId", "Code")
                         .IsUnique()
-                        .HasDatabaseName("ux_attribute_options_definition_display_order");
+                        .HasDatabaseName("ux_attribute_options_tenant_definition_code");
 
-                    b.ToTable("attribute_options", "catalog");
+                    b.HasIndex("TenantId", "AttributeDefinitionId", "DisplayOrder")
+                        .IsUnique()
+                        .HasDatabaseName("ux_attribute_options_tenant_definition_display_order");
+
+                    b.ToTable("attribute_options", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_attribute_options_display_order_nonnegative", "\"display_order\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.ProductType", b =>
@@ -186,6 +222,10 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("parent_product_type_id");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
@@ -209,19 +249,25 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasDatabaseName("ux_product_types_code");
-
-                    b.HasIndex("ParentProductTypeId")
-                        .HasDatabaseName("ix_product_types_parent_product_type_id");
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ux_product_types_tenant_id_id");
 
                     b.HasIndex("path")
                         .HasDatabaseName("ix_product_types_path_gist");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("path"), "gist");
 
-                    b.ToTable("product_types", "catalog");
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_product_types_tenant_code");
+
+                    b.HasIndex("TenantId", "ParentProductTypeId")
+                        .HasDatabaseName("ix_product_types_tenant_parent_product_type_id");
+
+                    b.ToTable("product_types", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_types_own_schema_version_nonnegative", "\"own_schema_version\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.Product", b =>
@@ -276,6 +322,10 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<DateTimeOffset?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
@@ -299,13 +349,22 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductTypeId")
-                        .HasDatabaseName("ix_products_not_deleted_product_type_id")
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ux_products_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ProductTypeId")
+                        .HasDatabaseName("ix_products_tenant_not_deleted_product_type_id")
                         .HasFilter("\"is_deleted\" = FALSE");
 
-                    b.HasIndex("Status", "IsDeleted");
+                    b.HasIndex("TenantId", "Status", "IsDeleted")
+                        .HasDatabaseName("ix_products_tenant_status_is_deleted");
 
-                    b.ToTable("products", "catalog");
+                    b.ToTable("products", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_products_specifications_is_object", "jsonb_typeof(\"specifications\") = 'object'");
+
+                            t.HasCheckConstraint("ck_products_specifications_key_count", "catalog.jsonb_key_count(\"specifications\") <= 50");
+                        });
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.ProductVariant", b =>
@@ -343,6 +402,10 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -351,18 +414,21 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId")
+                    b.HasAlternateKey("TenantId", "Id")
+                        .HasName("ux_product_variants_tenant_id_id");
+
+                    b.HasIndex("TenantId", "ProductId")
                         .IsUnique()
-                        .HasDatabaseName("ux_product_variants_default_per_product")
+                        .HasDatabaseName("ux_product_variants_tenant_default_per_product")
                         .HasFilter("\"is_default\" = TRUE");
 
-                    b.HasIndex("Sku")
+                    b.HasIndex("TenantId", "Sku")
                         .IsUnique()
-                        .HasDatabaseName("ux_product_variants_sku");
+                        .HasDatabaseName("ux_product_variants_tenant_sku");
 
-                    b.HasIndex("ProductId", "Options")
+                    b.HasIndex("TenantId", "ProductId", "Options")
                         .IsUnique()
-                        .HasDatabaseName("ux_product_variants_product_id_options");
+                        .HasDatabaseName("ux_product_variants_tenant_product_id_options");
 
                     b.ToTable("product_variants", "catalog");
                 });
@@ -396,6 +462,10 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_on_utc");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -404,8 +474,8 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OccurredOnUtc")
-                        .HasDatabaseName("ix_messages_pending_occurred_on_utc")
+                    b.HasIndex("TenantId", "OccurredOnUtc")
+                        .HasDatabaseName("ix_outbox_messages_tenant_pending_occurred_on_utc")
                         .HasFilter("\"processed_on_utc\" IS NULL");
 
                     b.ToTable("messages", "outbox");
@@ -413,6 +483,10 @@ namespace CommerceCore.Persistence.Migrations
 
             modelBuilder.Entity("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", b =>
                 {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
                     b.Property<Guid>("ProductTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_type_id");
@@ -436,9 +510,123 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnName("updated_at_utc")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.HasKey("ProductTypeId");
+                    b.HasKey("TenantId", "ProductTypeId");
 
-                    b.ToTable("product_type_effective_schema", "catalog");
+                    b.ToTable("product_type_effective_schema", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_product_type_effective_schema_effective_version_nonnegative", "\"effective_schema_version\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.Storefront", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("DefaultLocale")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("default_locale");
+
+                    b.Property<string>("HostName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("host_name");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("MarketCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("market_code");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_platform_storefronts_host_name");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("storefronts", "platform");
+                });
+
+            modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_platform_tenants_slug");
+
+                    b.ToTable("tenants", "platform");
+                });
+
+            modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.TenantMembership", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("UserSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("user_subject");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("TenantId", "UserSubject");
+
+                    b.HasIndex("UserSubject")
+                        .HasDatabaseName("ix_platform_tenant_memberships_user_subject");
+
+                    b.ToTable("tenant_memberships", "platform");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeDefinition", b =>
@@ -449,13 +637,28 @@ namespace CommerceCore.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_attribute_definitions_product_type");
+
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attribute_definitions_tenant");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeOption", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attribute_options_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.AttributeDefinition", null)
                         .WithMany("Options")
-                        .HasForeignKey("AttributeDefinitionId")
+                        .HasForeignKey("TenantId", "AttributeDefinitionId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_attribute_options_attribute_definition");
@@ -463,18 +666,34 @@ namespace CommerceCore.Persistence.Migrations
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.ProductType", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_types_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithMany()
-                        .HasForeignKey("ParentProductTypeId")
+                        .HasForeignKey("TenantId", "ParentProductTypeId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_product_types_parent_product_type");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.Product", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_products_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithMany()
-                        .HasForeignKey("ProductTypeId")
+                        .HasForeignKey("TenantId", "ProductTypeId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_products_product_type");
@@ -512,9 +731,17 @@ namespace CommerceCore.Persistence.Migrations
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.Products.ProductVariant", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_variants_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.Products.Product", null)
                         .WithMany("Variants")
-                        .HasForeignKey("ProductId")
+                        .HasForeignKey("TenantId", "ProductId")
+                        .HasPrincipalKey("TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_product_variants_product");
@@ -550,14 +777,52 @@ namespace CommerceCore.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("CommerceCore.Persistence.Outbox.OutboxMessage", b =>
+                {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_outbox_messages_tenant");
+                });
+
             modelBuilder.Entity("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", b =>
                 {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_product_type_effective_schema_tenant");
+
                     b.HasOne("CommerceCore.Domain.Catalog.ProductTypes.ProductType", null)
                         .WithOne()
-                        .HasForeignKey("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", "ProductTypeId")
+                        .HasForeignKey("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", "TenantId", "ProductTypeId")
+                        .HasPrincipalKey("CommerceCore.Domain.Catalog.ProductTypes.ProductType", "TenantId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_product_type_effective_schema_product_type");
+                });
+
+            modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.Storefront", b =>
+                {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_storefronts_tenant");
+                });
+
+            modelBuilder.Entity("CommerceCore.Platform.ControlPlane.Entities.TenantMembership", b =>
+                {
+                    b.HasOne("CommerceCore.Platform.ControlPlane.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_memberships_tenant");
                 });
 
             modelBuilder.Entity("CommerceCore.Domain.Catalog.ProductTypes.AttributeDefinition", b =>

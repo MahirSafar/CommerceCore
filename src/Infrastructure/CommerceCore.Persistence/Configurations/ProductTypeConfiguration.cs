@@ -1,6 +1,7 @@
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -16,7 +17,15 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
 
     public void Configure(EntityTypeBuilder<ProductType> builder)
     {
-        builder.ToTable("product_types", schema: "catalog");
+        builder.ToTable(
+            "product_types",
+            "catalog",
+            table =>
+            {
+                table.HasCheckConstraint(
+                    "ck_product_types_own_schema_version_nonnegative",
+                    "\"own_schema_version\" >= 0");
+            });
 
         builder.HasKey(productType => productType.Id);
 
@@ -33,6 +42,12 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
                 id => id.Value,
                 value => TenantId.From(value))
             .IsRequired();
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(entity => entity.TenantId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_product_types_tenant");
 
         builder.HasAlternateKey(productType => new { productType.TenantId, productType.Id })
             .HasName("ux_product_types_tenant_id_id");
@@ -89,7 +104,16 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
 
         builder.HasOne<ProductType>()
             .WithMany()
-            .HasForeignKey(productType => productType.ParentProductTypeId)
+            .HasPrincipalKey(parent => new
+            {
+                parent.TenantId,
+                parent.Id
+            })
+            .HasForeignKey(child => new
+            {
+                child.TenantId,
+                child.ParentProductTypeId
+            })
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_types_parent_product_type");
 

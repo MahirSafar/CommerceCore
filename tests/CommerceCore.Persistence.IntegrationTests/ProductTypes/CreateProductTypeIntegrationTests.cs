@@ -1,9 +1,9 @@
 using System.Text.Json;
 using CommerceCore.Application.Catalog.ProductTypes.Commands.CreateProductType;
-using CommerceCore.Application.Common.Abstractions.Persistence;
 using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
+using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Persistence.ProductTypes;
 using CommerceCore.Platform.Contracts;

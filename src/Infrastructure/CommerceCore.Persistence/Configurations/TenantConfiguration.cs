@@ -1,3 +1,4 @@
+using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -14,6 +15,9 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(tenant => tenant.Id)
             .HasColumnName("id")
+            .HasConversion(
+                id => id.Value,
+                value => TenantId.From(value))
             .ValueGeneratedNever();
 
         builder.Property(tenant => tenant.Slug)
