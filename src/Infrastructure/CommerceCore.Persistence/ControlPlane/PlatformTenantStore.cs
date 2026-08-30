@@ -33,14 +33,24 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
             .FirstOrDefaultAsync(s => s.HostName.ToLower() == normalizedHost, cancellationToken);
     }
 
-    public async Task<TenantMembership?> GetMembershipByUserSubjectAsync(string userSubject, CancellationToken cancellationToken = default)
+    public async Task<TenantMembership?> GetActiveMembershipAsync(
+        TenantId tenantId,
+        string userSubject,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(userSubject))
+        {
             return null;
+        }
 
         return await _dbContext.Set<TenantMembership>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.UserSubject == userSubject && m.Status == "Active", cancellationToken);
+            .SingleOrDefaultAsync(
+                membership =>
+                    membership.TenantId == tenantId &&
+                    membership.UserSubject == userSubject &&
+                    membership.Status == "Active",
+                cancellationToken);
     }
 
     public async Task<Tenant?> GetTenantByPartnerClientIdAsync(string clientId, CancellationToken cancellationToken = default)

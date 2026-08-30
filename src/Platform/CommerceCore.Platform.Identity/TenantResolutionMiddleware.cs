@@ -47,6 +47,25 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
         else if (path.StartsWith("/api/admin"))
         {
+            var host = context.Request.Host.Host;
+
+            var storefront = await tenantStore.GetStorefrontByHostAsync(
+                host,
+                context.RequestAborted);
+
+            if (storefront is null || !storefront.IsActive)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    Title = "Invalid Storefront",
+                    Status = StatusCodes.Status400BadRequest,
+                    Detail = $"Storefront for host '{host}' was not found or is inactive."
+                });
+
+                return;
+            }
+
             var userSub = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? context.User.FindFirst("sub")?.Value;
 
@@ -56,21 +75,30 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            var membership = await tenantStore.GetMembershipByUserSubjectAsync(userSub, context.RequestAborted);
-            if (membership is null || membership.Status != "Active")
+            var membership = await tenantStore.GetActiveMembershipAsync(
+                storefront.TenantId,
+                userSub,
+                context.RequestAborted);
+
+            if (membership is null)
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 await context.Response.WriteAsJsonAsync(new
                 {
-                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
                     Title = "Tenant Membership Forbidden",
                     Status = StatusCodes.Status403Forbidden,
-                    Detail = "Authenticated user does not have active membership in any tenant."
+                    Detail = "Authenticated user has no active membership in this tenant."
                 });
+
                 return;
             }
 
-            var tenantContext = TenantContext.ForTenant(membership.TenantId);
+            var tenantContext = TenantContext.ForTenant(
+                storefront.TenantId,
+                storefront.StorefrontId,
+                storefront.MarketId,
+                storefront.DefaultLocale);
+
             HttpTenantContext.SetContext(context, tenantContext);
         }
         else if (path.StartsWith("/api/partner"))
@@ -102,34 +130,59 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         }
         else
         {
-            // For legacy /api/v1/catalog/* routes during transition: resolve via header fallback or storefront
             var host = context.Request.Host.Host;
-            var storefront = await tenantStore.GetStorefrontByHostAsync(host, context.RequestAborted);
-            if (storefront is not null && storefront.IsActive)
-            {
-                var tenantContext = TenantContext.ForTenant(
-                    storefront.TenantId,
-                    storefront.StorefrontId,
-                    storefront.MarketId,
-                    storefront.DefaultLocale);
 
-                HttpTenantContext.SetContext(context, tenantContext);
-            }
-            else if (context.User.Identity?.IsAuthenticated == true)
-            {
-                var userSub = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                    ?? context.User.FindFirst("sub")?.Value;
+            var storefront = await tenantStore.GetStorefrontByHostAsync(
+                host,
+                context.RequestAborted);
 
-                if (!string.IsNullOrWhiteSpace(userSub))
+            if (storefront is null || !storefront.IsActive)
+            {
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await context.Response.WriteAsJsonAsync(new
                 {
-                    var membership = await tenantStore.GetMembershipByUserSubjectAsync(userSub, context.RequestAborted);
-                    if (membership is not null && membership.Status == "Active")
-                    {
-                        var tenantContext = TenantContext.ForTenant(membership.TenantId);
-                        HttpTenantContext.SetContext(context, tenantContext);
-                    }
-                }
+                    Title = "Invalid Storefront",
+                    Status = StatusCodes.Status400BadRequest,
+                    Detail = $"Storefront for host '{host}' was not found or is inactive."
+                });
+
+                return;
             }
+
+            var userSub = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? context.User.FindFirst("sub")?.Value;
+
+            if (string.IsNullOrWhiteSpace(userSub))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            var membership = await tenantStore.GetActiveMembershipAsync(
+                storefront.TenantId,
+                userSub,
+                context.RequestAborted);
+
+            if (membership is null)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    Title = "Tenant Membership Forbidden",
+                    Status = StatusCodes.Status403Forbidden,
+                    Detail = "Authenticated user has no active membership in this tenant."
+                });
+
+                return;
+            }
+
+            var tenantContext = TenantContext.ForTenant(
+                storefront.TenantId,
+                storefront.StorefrontId,
+                storefront.MarketId,
+                storefront.DefaultLocale);
+
+            HttpTenantContext.SetContext(context, tenantContext);
         }
 
         if (!HttpTenantContext.HasResolvedTenant(context))

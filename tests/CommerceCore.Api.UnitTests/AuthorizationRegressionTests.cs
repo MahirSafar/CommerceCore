@@ -59,11 +59,17 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                         new[] { "ready" }));
                 });
 
+                var testTenantId =
+                    CommerceCore.Platform.Contracts.TenantId.New();
+
                 var mockTenantStore = NSubstitute.Substitute.For<CommerceCore.Platform.ControlPlane.IPlatformTenantStore>();
-                mockTenantStore.GetMembershipByUserSubjectAsync(NSubstitute.Arg.Any<string>(), NSubstitute.Arg.Any<CancellationToken>())
+                mockTenantStore.GetActiveMembershipAsync(
+                        testTenantId,
+                        "test-user",
+                        NSubstitute.Arg.Any<CancellationToken>())
                     .Returns(new CommerceCore.Platform.ControlPlane.Entities.TenantMembership
                     {
-                        TenantId = CommerceCore.Platform.Contracts.TenantId.New(),
+                        TenantId = testTenantId,
                         UserSubject = "test-user",
                         Role = "Admin",
                         Status = "Active"
@@ -72,7 +78,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                     .Returns(new CommerceCore.Platform.ControlPlane.Entities.Storefront
                     {
                         Id = Guid.NewGuid(),
-                        TenantId = CommerceCore.Platform.Contracts.TenantId.New(),
+                        TenantId = testTenantId,
                         HostName = "localhost",
                         IsActive = true
                     });
