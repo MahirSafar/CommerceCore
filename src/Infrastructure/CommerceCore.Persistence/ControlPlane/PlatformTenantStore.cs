@@ -52,15 +52,4 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
                     membership.Status == "Active",
                 cancellationToken);
     }
-
-    public async Task<Tenant?> GetTenantByPartnerClientIdAsync(string clientId, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(clientId))
-            return null;
-
-        // Partner client id mapping: slug or direct match
-        return await _dbContext.Set<Tenant>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Slug == clientId, cancellationToken);
-    }
 }

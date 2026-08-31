@@ -11,5 +11,4 @@ public interface IPlatformTenantStore
         TenantId tenantId,
         string userSubject,
         CancellationToken cancellationToken = default);
-    Task<Tenant?> GetTenantByPartnerClientIdAsync(string clientId, CancellationToken cancellationToken = default);
 }
