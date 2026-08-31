@@ -31,5 +31,8 @@ jobs:
       - name: Build Solution (Release Mode)
         run: dotnet build CommerceCore.slnx --no-restore --configuration Release
 
+      - name: Build API container image
+        run: docker build --tag commercecore-api:ci .
+
       - name: Run complete test suite
         run: dotnet test CommerceCore.slnx --no-build --configuration Release --verbosity normal
