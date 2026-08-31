@@ -31,6 +31,20 @@ jobs:
       - name: Build Solution (Release Mode)
         run: dotnet build CommerceCore.slnx --no-restore --configuration Release
 
+      - name: Restore local .NET tools
+        run: dotnet tool restore
+
+      - name: Verify EF Core migration model is current
+        env:
+          DOTNET_ENVIRONMENT: Development
+          ConnectionStrings__CommerceCoreDatabase: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
+        run: >
+          dotnet ef migrations has-pending-model-changes
+          --project src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj
+          --startup-project src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj
+          --configuration Release
+          --no-build
+
       - name: Build API container image
         run: docker build --tag commercecore-api:ci .
 
