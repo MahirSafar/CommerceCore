@@ -3,7 +3,7 @@
 public abstract class BaseEntity<TKey> : IEquatable<BaseEntity<TKey>>
   where TKey : notnull
 {
-    protected BaseEntity()
+    protected BaseEntity()
     {
     }
 
@@ -29,7 +29,7 @@ public abstract class BaseEntity<TKey> : IEquatable<BaseEntity<TKey>>
         if (ReferenceEquals(this, other))
             return true;
 
-        if (GetType() != other.GetType())
+        if (GetType() != other.GetType())
             return false;
 
         if (IsTransient(Id) || IsTransient(other.Id))

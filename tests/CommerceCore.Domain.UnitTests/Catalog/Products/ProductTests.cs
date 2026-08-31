@@ -17,7 +17,7 @@ public class ProductTests
     private static readonly TenantId TestTenantId = TenantId.New();
     private static readonly DateTimeOffset TestTime = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
 
-    private static LocalizedText CreateValidName(string text = "Test məhsulu") => 
+    private static LocalizedText CreateValidName(string text = "Test məhsulu") =>
         LocalizedText.Create(LanguageCode.Create("en"), new Dictionary<LanguageCode, string> { { LanguageCode.Create("en"), text } });
 
     private static Money CreateValidPrice(decimal amount = 100) => Money.Create(amount, "USD");

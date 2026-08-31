@@ -96,7 +96,7 @@ public sealed class AttributeValueBag : IEquatable<AttributeValueBag>
         return hash.ToHashCode();
     }
 
-    private static void EnsureInitialized(AttributeKey key) 
+    private static void EnsureInitialized(AttributeKey key)
     {
         if (key == default)
             throw new ArgumentException("Attribute key must be initialized.", nameof(key));

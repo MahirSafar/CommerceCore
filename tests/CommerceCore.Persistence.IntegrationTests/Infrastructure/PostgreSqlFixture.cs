@@ -135,7 +135,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         services.AddSingleton<ITenantContext>(sp => sp.GetRequiredService<TestTenantContext>());
 
         services.AddPersistence(applicationConnectionString);
-        
+
         services.AddCatalogApplication();
 
         Services = services.BuildServiceProvider();

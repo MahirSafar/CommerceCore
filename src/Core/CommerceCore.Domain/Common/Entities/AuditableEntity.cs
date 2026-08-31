@@ -14,7 +14,7 @@ public abstract class AuditableEntity<TKey> : BaseEntity<TKey>, IAuditableEntity
     {
     }
 
-    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
     public string? CreatedBy { get; private set; }
 
     public DateTimeOffset? UpdatedAtUtc { get; private set; }

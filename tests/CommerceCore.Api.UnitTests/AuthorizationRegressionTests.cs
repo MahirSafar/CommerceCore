@@ -47,7 +47,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                     options.Authority = string.Empty;
                     options.MetadataAddress = string.Empty;
                 });
-                
+
                 // Override health checks to always return healthy so /health/ready returns 200
                 services.Configure<HealthCheckServiceOptions>(options =>
                 {
@@ -84,7 +84,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                     });
                 services.AddScoped(_ => mockTenantStore);
             });
-            
+
             builder.UseEnvironment("Development");
         });
     }
@@ -96,7 +96,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
         DateTime? expires = null)
     {
         var client = _factory.CreateClient();
-        
+
         var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, "test-user"),
@@ -129,7 +129,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         var client = _factory.CreateClient();
         var response = await client.GetAsync($"/api/products/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -139,7 +139,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
         var client = CreateClientWithToken(["catalog.read"]);
         var content = new StringContent("{}", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/products", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -149,7 +149,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
         var client = CreateClientWithToken(["catalog.manage"]);
         var content = new StringContent("{}", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/products", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -157,10 +157,10 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     public async Task PostProduct_WithManageScopeAndEmptyBody_ReturnsBadRequest()
     {
         var client = CreateClientWithToken(["catalog.read", "catalog.manage"]);
-        
+
         var content = new StringContent("", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/products", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -170,7 +170,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
         var client = CreateClientWithToken(["catalog.schema.manage"]);
         var content = new StringContent("{}", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/product-types", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -178,10 +178,10 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     public async Task PostProductType_WithSchemaManageScopeAndEmptyBody_ReturnsBadRequest()
     {
         var client = CreateClientWithToken(["catalog.read", "catalog.schema.manage"]);
-        
+
         var content = new StringContent("", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/product-types", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -189,10 +189,10 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     public async Task PostProductType_WithCatalogManagerScopes_ReturnsForbidden()
     {
         var client = CreateClientWithToken(["catalog.read", "catalog.manage"]);
-        
+
         var content = new StringContent("{}", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/product-types", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -200,10 +200,10 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     public async Task PostProduct_WithSchemaManagerScopes_ReturnsForbidden()
     {
         var client = CreateClientWithToken(["catalog.read", "catalog.schema.manage"]);
-        
+
         var content = new StringContent("{}", Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/api/products", content, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -212,7 +212,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         var client = CreateClientWithToken(["catalog.read"], audience: "invalid-audience");
         var response = await client.GetAsync($"/api/products/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -221,7 +221,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         var client = CreateClientWithToken(["catalog.read"], signingKey: InvalidTestKey);
         var response = await client.GetAsync($"/api/products/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -230,7 +230,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         var client = CreateClientWithToken(["catalog.read"], expires: DateTime.UtcNow.AddMinutes(-5));
         var response = await client.GetAsync($"/api/products/{Guid.NewGuid()}", TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -241,7 +241,7 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
     {
         var client = _factory.CreateClient();
         var response = await client.GetAsync(endpoint, TestContext.Current.CancellationToken);
-        
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 

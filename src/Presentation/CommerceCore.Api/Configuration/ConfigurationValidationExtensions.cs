@@ -4,7 +4,7 @@ internal static class ConfigurationValidationExtensions
 {
     public static void ValidateConfiguration(this IHostApplicationBuilder builder)
     {
-        _ = builder.Configuration.GetConnectionString("CommerceCoreDatabase") 
+        _ = builder.Configuration.GetConnectionString("CommerceCoreDatabase")
             ?? throw new InvalidOperationException("Connection string 'CommerceCoreDatabase' was not found");
 
         string? allowedHosts = builder.Configuration["AllowedHosts"];

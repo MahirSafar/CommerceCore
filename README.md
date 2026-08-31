@@ -5,140 +5,146 @@
 [![C# 13/14](https://img.shields.io/badge/C%23-13%2F14-239120?style=flat&logo=csharp)](https://docs.microsoft.com/dotnet/csharp/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.6-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4?style=flat&logo=dotnet)](https://docs.microsoft.com/ef/core/)
-[![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith%20%2F%20Clean%20%2F%20DDD%20%2F%20CQRS-blueviolet?style=flat)]()
+[![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith%20%7C%20Clean%20%7C%20DDD%20%7C%20CQRS-blueviolet?style=flat)]()
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Pool%20%2B%20PostgreSQL%20RLS-orange?style=flat)]()
 [![Tests](https://img.shields.io/badge/Tests-225%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
 
-**CommerceCore** is an enterprise-grade, high-performance modular e-commerce backend built with **.NET 10**, adhering strictly to the principles of **Modular Monolith**, **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS (Command Query Responsibility Segregation)**.
+**CommerceCore** is an enterprise-grade, high-performance modular e-commerce backend platform built with **.NET 10**, engineered around the principles of **Modular Monolith**, **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS (Command Query Responsibility Segregation)**.
 
-The platform is engineered for scale and security, featuring multi-tenant pool isolation with native **PostgreSQL Row-Level Security (RLS)**, compile-time source-generated mediation, dynamic attribute schema compilation, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, transactional outbox messaging, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
+Engineered for extreme reliability, throughput, and multi-tenant isolation, the system provides native database-level **PostgreSQL Row-Level Security (RLS)**, compile-time source-generated mediation, a dynamic attribute & schema compilation engine, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, transactional outbox messaging, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
 
 ---
 
 ## Table of Contents
 
-- [Architecture Overview](#architecture-overview)
+- [Architectural Blueprint](#architectural-blueprint)
 - [Multi-Tenancy & Row-Level Security (RLS)](#multi-tenancy--row-level-security-rls)
-- [Key Features & Engineering Highlights](#key-features--engineering-highlights)
-- [Project & Solution Structure](#project--solution-structure)
-- [Technology Stack](#technology-stack)
+- [Key Engineering Highlights](#key-engineering-highlights)
+- [Solution & Project Decomposition](#solution--project-decomposition)
+- [Technology Matrix](#technology-matrix)
 - [Domain Model & Invariants](#domain-model--invariants)
   - [1. Product & Product Variant Aggregates](#1-product--product-variant-aggregates)
-  - [2. ProductType Aggregate & Dynamic Attribute Schema](#2-producttype-aggregate--dynamic-attribute-schema)
-  - [3. Platform & Multi-Tenancy Entities](#3-platform--multi-tenancy-entities)
-  - [4. Value Objects](#4-value-objects)
-- [Persistence & Database Design](#persistence--database-design)
-  - [Schemas & Tables](#schemas-and-tables)
-  - [PostgreSQL Row-Level Security (RLS) Policies](#postgresql-row-level-security-rls-policies)
-  - [Strategic Indexes](#strategic-indexes)
+  - [2. ProductType & Dynamic Attribute Schema Engine](#2-producttype--dynamic-attribute-schema-engine)
+  - [3. Platform Control Plane & Multi-Tenancy](#3-platform-control-plane--multi-tenancy)
+  - [4. Core Value Objects](#4-core-value-objects)
+- [Persistence & Database Architecture](#persistence--database-architecture)
+  - [Relational Schemas & Tables](#relational-schemas--tables)
+  - [PostgreSQL Row-Level Security (RLS) Engine](#postgresql-row-level-security-rls-engine)
+  - [Strategic Indexing & Query Optimizations](#strategic-indexing--query-optimizations)
 - [Security, Resilience & Observability](#security-resilience--observability)
   - [Authentication & Scoped Authorization](#authentication--scoped-authorization)
   - [Partitioned Rate Limiting](#partitioned-rate-limiting)
-  - [Security Headers](#security-headers)
-  - [OpenTelemetry & Health Checks](#opentelemetry--health-checks)
-- [API Endpoints Reference](#api-endpoints-reference)
-  - [Product Endpoints](#product-endpoints)
+  - [Security Headers & Hardening](#security-headers--hardening)
+  - [OpenTelemetry & Health Probes](#opentelemetry--health-probes)
+- [API Reference & Contracts](#api-reference--contracts)
+  - [Product & Variant Endpoints](#product--variant-endpoints)
   - [Product Type & Attribute Endpoints](#product-type--attribute-endpoints)
   - [Health Check Endpoints](#health-check-endpoints)
   - [Sample Payloads & Responses](#sample-payloads--responses)
-- [Error Handling & Problem Details](#error-handling--problem-details)
+- [Error Handling & RFC 7807 Problem Details](#error-handling--rfc-7807-problem-details)
 - [Getting Started & Local Setup](#getting-started--local-setup)
-- [Testing Strategy](#testing-strategy)
-- [Design Patterns & Engineering Practices](#design-patterns--engineering-practices)
+- [Testing Strategy & Quality Assurance](#testing-strategy--quality-assurance)
+- [Engineering Practices & Design Patterns](#engineering-practices--design-patterns)
 
 ---
 
-## Architecture Overview
+## Architectural Blueprint
 
-CommerceCore adopts a **Modular Monolith** combined with **Clean Architecture** (Ports and Adapters / Onion Architecture). Layer boundaries and modular decoupling are continuously asserted by automated architectural tests (`NetArchTest`).
+CommerceCore employs a **Modular Monolith** architecture combined with **Clean Architecture** (Ports and Adapters / Onion Architecture). Layer boundaries and modular decoupling rules are strictly asserted by automated architectural tests (`NetArchTest`).
 
 ```
-                              ┌──────────────────────────────────────┐
-                              │          Presentation Layer          │
-                              │         (CommerceCore.Api)           │
-                              │  - Minimal API Endpoints (V1)        │
-                              │  - Multi-Tenant & Security Pipeline  │
-                              │  - RFC 7807 Global Exception Handler │
-                              │  - Rate Limiting & Observability     │
-                              └───────────────┬──────────────────────┘
-                                              │
-                    ┌─────────────────────────┴─────────────────────────┐
-                    │                                                   │
-     ┌──────────────▼──────────────────────┐             ┌──────────────▼──────────────────────┐
-     │          Platform Modules           │             │          Catalog Module             │
-     │  - CommerceCore.Platform.Identity   │             │  - CommerceCore.Modules.Catalog.App │
-     │  - CommerceCore.Platform.Control... │             │  - CommerceCore.Modules.Catalog.Dom │
-     │  - CommerceCore.Platform.Contracts  │             │  - CommerceCore.Modules.Catalog.Inf │
-     └──────────────┬──────────────────────┘             └──────────────┬──────────────────────┘
-                    │                                                   │
-                    └─────────────────────────┬─────────────────────────┘
-                                              │
-                              ┌───────────────▼──────────────────────┐
-                              │             Core Layer               │
-                              │  - CommerceCore.Application (CQRS)   │
-                              │  - CommerceCore.Domain (Entities)    │
-                              │  - Mediator Pipelines & Behaviors    │
-                              └───────────────┬──────────────────────┘
-                                              │
-                              ┌───────────────▼──────────────────────┐
-                              │         Infrastructure Layer         │
-                              │  - CommerceCore.Persistence          │
-                              │    (EF Core 10, Npgsql, RLS, Outbox) │
-                              │  - CommerceCore.Infrastructure       │
-                              │    (SystemClock, System Services)    │
-                              └──────────────────────────────────────┘
+                              ┌──────────────────────────────────────────────┐
+                              │              Presentation Layer              │
+                              │             (CommerceCore.Api)               │
+                              │  - Minimal API Route Endpoints (V1)          │
+                              │  - Multi-Tenant & Security Middleware        │
+                              │  - Rate Limiter & Observability Instrumentation│
+                              │  - RFC 7807 Problem Details Exception Handler│
+                              └──────────────────────┬───────────────────────┘
+                                                     │
+                    ┌────────────────────────────────┴────────────────────────────────┐
+                    │                                                                 │
+     ┌──────────────▼──────────────────────────────┐   ┌──────────────────────────────▼──────────────┐
+     │              Platform Module                │   │                Catalog Module               │
+     │  - CommerceCore.Platform.Contracts          │   │  - CommerceCore.Modules.Catalog.Contracts   │
+     │  - CommerceCore.Platform.ControlPlane       │   │  - CommerceCore.Modules.Catalog.Domain      │
+     │  - CommerceCore.Platform.Identity           │   │  - CommerceCore.Modules.Catalog.Application │
+     └──────────────────────┬──────────────────────┘   │  - CommerceCore.Modules.Catalog.Infrastr... │
+                            │                          └──────────────────────┬──────────────────────┘
+                            └────────────────────────┬────────────────────────┘
+                                                     │
+                              ┌──────────────────────▼───────────────────────┐
+                              │                  Core Layer                  │
+                              │  - CommerceCore.Domain (Base Entities, VOs)  │
+                              │  - CommerceCore.Application (CQRS Behaviors) │
+                              │  - Source-Generated Mediator Pipeline        │
+                              └──────────────────────┬───────────────────────┘
+                                                     │
+                              ┌──────────────────────▼───────────────────────┐
+                              │             Infrastructure Layer             │
+                              │  - CommerceCore.Persistence (EF Core 10,     │
+                              │    PostgreSQL RLS, Outbox, Interceptors)     │
+                              │  - CommerceCore.Infrastructure (Clock, System)│
+                              └──────────────────────────────────────────────┘
 ```
 
-### Modular Layer Boundaries
+### Layer Responsibilities & Dependency Rules
 
-- **`CommerceCore.Domain` & `CommerceCore.Modules.Catalog.Domain`**: Pure business logic with **zero** external framework dependencies. Encapsulates aggregates, entities, value objects, domain events, and domain exceptions.
-- **`CommerceCore.Application` & `CommerceCore.Modules.Catalog.Application`**: Use cases, CQRS commands/queries, source-generated mediator handlers, validation behaviors, and contract abstractions.
-- **`CommerceCore.Platform.*`**: Multi-tenancy isolation contracts (`ITenantContext`), control plane store (`PlatformTenantStore`), tenant resolution middlewares, and security extensions.
-- **`CommerceCore.Persistence` & `CommerceCore.Infrastructure`**: EF Core 10 PostgreSQL DbContext, interceptors (`TenantSessionInterceptor`, `AuditingSaveChangesInterceptor`, `OutboxSaveChangesInterceptor`), schema configurations, and migrations.
-- **`CommerceCore.Api`**: Entry point composing all modules, hosting Minimal APIs, OpenAPI specs, rate limiters, security headers, and health probes.
+| Layer / Module | Scope & Responsibilities | Dependency Constraints |
+|---|---|---|
+| **Domain** | Pure business models, aggregates, immutable value objects, domain events, domain exceptions, and invariant rules. | **Zero dependencies** on external frameworks, ORMs, or IO libraries. |
+| **Application** | CQRS use cases, commands, queries, mediator handlers, and validation pipeline behaviors (`ValidationBehavior`). | Depends only on **Domain**. No references to persistence, database drivers, or presentation frameworks. |
+| **Platform** | Multi-tenant isolation contracts (`ITenantContext`), tenant control plane entities, storefront resolution, and identity integration. | Shared cross-cutting foundation for all functional modules. |
+| **Catalog Module** | Full product catalog, variants, dynamic attribute definitions, option sets, taxonomy hierarchies, and schema compilation. | Modular domain and application boundaries, encapsulating catalog-specific business logic. |
+| **Persistence & Infra** | PostgreSQL EF Core 10 DbContext, connection interceptors (`TenantSessionInterceptor`, `AuditingSaveChangesInterceptor`, `OutboxSaveChangesInterceptor`), schema configurations, and migrations. | Implements Application abstractions using concrete PostgreSQL drivers and EF Core mappings. |
+| **Presentation (API)** | Application composition root, Minimal APIs, rate limiting, security headers, authentication, and OpenTelemetry instrumentation. | References application and infrastructure modules to compose the runtime pipeline. |
 
 ---
 
 ## Multi-Tenancy & Row-Level Security (RLS)
 
-CommerceCore implements a **Pool-Based Multi-Tenancy** architecture where all tenants share the same PostgreSQL database while maintaining strict data isolation at the database engine level via **PostgreSQL Row-Level Security (RLS)**.
+CommerceCore uses a **Pool-Based Multi-Tenancy** model where tenants share a single high-performance PostgreSQL database while enforcing isolation directly at the database engine level via **PostgreSQL Row-Level Security (RLS)**.
 
 ```
-Incoming Request
-      │
-      ▼
-┌────────────────────────────────────────────────────────┐
-│ TenantResolutionMiddleware                             │
-│ - Resolves Tenant from JWT claim or 'X-Tenant-ID'     │
-│ - Validates tenant state in PlatformTenantStore        │
-│ - Sets Scoped ITenantContext (TenantId, StorefrontId)  │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ TenantSessionInterceptor (EF Core DbConnection)        │
-│ - Executes: SET LOCAL app.current_tenant_id = '<guid>' │
-│ - Applies session variable for the connection scope    │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ PostgreSQL Row-Level Security (RLS) Engine             │
-│ - Enforces: tenant_id = NULLIF(current_setting(        │
-│             'app.current_tenant_id', true), '')::uuid │
-│ - Zero cross-tenant data leak even on raw SQL queries │
-└────────────────────────────────────────────────────────┘
+Incoming HTTP Request
+          │
+          ▼
+┌────────────────────────────────────────────────────────────┐
+│ 1. TenantResolutionMiddleware                              │
+│    - Resolves Host from request header                     │
+│    - Matches Host against platform.storefronts (cached)    │
+│    - Extracts user subject from JWT ('sub' / NameIdentifier)│
+│    - Verifies active membership in platform.tenant_members │
+│    - Populates Scoped ITenantContext (TenantId, Storefront)│
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│ 2. TenantSessionInterceptor (DbConnectionInterceptor)      │
+│    - Intercepts EF Core database connection open           │
+│    - Executes: SELECT set_config('app.tenant_id', @id, false)│
+│    - Sets session variable for the connection lifetime     │
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│ 3. PostgreSQL Native Row-Level Security (RLS) Engine       │
+│    - Evaluates: tenant_id = NULLIF(current_setting(        │
+│                 'app.tenant_id', true), '')::uuid          │
+│    - Applied to ALL SELECT, INSERT, UPDATE, DELETE queries │
+│    - Defense-in-depth: guarantees zero cross-tenant leak   │
+└────────────────────────────────────────────────────────────┘
 ```
 
-- **Control Plane**: Manages `platform.tenants`, `platform.storefronts`, and `platform.tenant_memberships`.
-- **Database-Level Defense in Depth**: In addition to EF Core global query filters, PostgreSQL RLS policies guarantee tenant isolation directly inside the database engine.
+- **Fail-Safe Isolation**: Even if application-level filters are bypassed, PostgreSQL RLS physically prevents any query or command from accessing another tenant's rows.
+- **Dynamic Host Routing**: Storefronts dynamically map domain names (e.g., `us.store.com`, `eu.store.com`) to specific tenants, markets, and default locales.
 
 ---
 
-## Key Features & Engineering Highlights
+## Key Engineering Highlights
 
 - **Compile-Time Source-Generated Mediator**: Utilizes `Mediator.SourceGenerator` for zero-reflection, high-throughput CQRS dispatching with compile-time pipeline behaviors (`ValidationBehavior`).
-- **PostgreSQL Row-Level Security (RLS)**: Automatic tenant session binding (`SET LOCAL app.current_tenant_id`) ensuring bulletproof multi-tenant isolation.
+- **PostgreSQL Row-Level Security (RLS)**: Automatic tenant session binding (`set_config('app.tenant_id', ...)`) ensuring bulletproof multi-tenant isolation.
 - **Explicit Product Variants**: Full support for matrix variations with custom SKUs, variant pricing, default variant assignment, and dynamic variant option bags.
 - **Dynamic Attribute Schema & Versioning**: Strongly-typed attributes (`Text`, `Integer`, `Decimal`, `Boolean`, `SingleSelect`, `MultiSelect`, `Measurement`) with scopes, validation bounds, enforcement states (`Draft`, `Backfilling`, `Enforced`, `Deprecated`), and compiled JSONB effective schemas.
 - **Native UUIDv7 Primary Keys**: Uses .NET 10's native `Guid.CreateVersion7()` for time-sortable sequential identifiers, eliminating B-Tree index fragmentation and boosting PostgreSQL write throughput.
@@ -154,74 +160,39 @@ Incoming Request
 
 ---
 
-## Project & Solution Structure
+## Solution & Project Decomposition
 
 ```text
 CommerceCore/
-├── CommerceCore.slnx                                   # Solution definition (.slnx)
-├── docker-compose.yml                                  # PostgreSQL 18.6 & pgAdmin 4 local environment
-├── dotnet-tools.json                                   # Local dotnet tools (dotnet-ef)
+├── CommerceCore.slnx                                   # Modern solution manifest (.slnx)
+├── docker-compose.yml                                  # Local development infrastructure (PostgreSQL 18.6 & pgAdmin 4)
+├── Dockerfile                                          # Multi-stage production container build
+├── dotnet-tools.json                                   # Local CLI tools (dotnet-ef)
 ├── global.json                                         # Microsoft Testing Platform configuration
 │
 ├── src/
 │   ├── Core/
-│   │   ├── CommerceCore.Application/                   # Core CQRS Abstractions & Validation Behaviors
-│   │   │   ├── Common/
-│   │   │   │   ├── Abstractions/                       # IClock, ICurrentUser, Persistence Interfaces
-│   │   │   │   ├── Behaviors/                          # ValidationBehavior<TMessage, TResponse>
-│   │   │   │   ├── Factories/                          # LocalizedTextFactory
-│   │   │   │   └── Validation/                         # LocalizedText & Money validation rules
-│   │   │   └── DependencyInjection.cs
-│   │   │
-│   │   └── CommerceCore.Domain/                        # Core Shared Entities & Value Objects
-│   │       └── Common/
-│   │           ├── Entities/                           # BaseEntity, AggregateRoot, Auditable, SoftDelete
-│   │           ├── Events/                             # IDomainEvent, DomainEvent, IHasDomainEvents
-│   │           ├── Exceptions/                         # DomainException
-│   │           ├── Interfaces/                         # IAuditableEntity, ISoftDeletable
-│   │           └── ValueObjects/                       # Money, LanguageCode, LocalizedText
+│   │   ├── CommerceCore.Domain/                        # Shared AggregateRoot, BaseEntity, ValueObjects, Events
+│   │   └── CommerceCore.Application/                   # Core CQRS Abstractions, ValidationBehavior, ValidationRules
 │   │
-│   ├── Infrastructure/
-│   │   ├── CommerceCore.Infrastructure/                # Infrastructure Implementations (SystemClock)
-│   │   └── CommerceCore.Persistence/                   # PostgreSQL EF Core 10 Persistence Layer
-│   │       ├── Configurations/                         # Entity configurations with RLS & JSONB mappings
-│   │       ├── ControlPlane/                           # PlatformTenantStore implementation
-│   │       ├── Interceptors/                           # TenantSession, Auditing, Outbox Interceptors
-│   │       ├── Migrations/                             # EF Core Code-First Migrations (RLS, ltree, Outbox)
-│   │       ├── Outbox/                                 # OutboxMessage entity model
-│   │       ├── ProductTypes/                           # Schema Registry & Coordination
-│   │       ├── Serialization/                          # AttributeValueBag JSON Converter
-│   │       └── CommerceCoreDbContext.cs                # Unified Application DbContext
+│   ├── Platform/
+│   │   ├── CommerceCore.Platform.Contracts/            # Multi-Tenancy abstractions (ITenantContext, TenantId, MarketId)
+│   │   ├── CommerceCore.Platform.ControlPlane/         # Tenant, Storefront, TenantMembership entities & store
+│   │   └── CommerceCore.Platform.Identity/             # TenantResolutionMiddleware, Identity & Scope extensions
 │   │
 │   ├── Modules/
 │   │   └── Catalog/
-│   │       ├── CommerceCore.Modules.Catalog.Application/ # Catalog CQRS Commands, Queries & Handlers
-│   │       │   └── Catalog/
-│   │       │       ├── Products/                       # Product & Variant Commands & Queries
-│   │       │       └── ProductTypes/                   # ProductType & Attribute Commands
-│   │       ├── CommerceCore.Modules.Catalog.Contracts/   # Inter-Module Catalog Contracts
-│   │       ├── CommerceCore.Modules.Catalog.Domain/      # Catalog Aggregates & Domain Logic
-│   │       │   └── Catalog/
-│   │       │       ├── Attributes/                     # AttributeValue, AttributeValueBag, Normalizers
-│   │       │       ├── Categories/                     # CategoryId Value Object
-│   │       │       ├── Products/                       # Product & ProductVariant Aggregates, SKU, Events
-│   │       │       └── ProductTypes/                   # ProductType Aggregate, Definitions, EffectiveSchema
-│   │       └── CommerceCore.Modules.Catalog.Infrastructure/ # Catalog-specific infrastructure
+│   │       ├── CommerceCore.Modules.Catalog.Contracts/ # Inter-module catalog contracts
+│   │       ├── CommerceCore.Modules.Catalog.Domain/    # Product, ProductVariant, ProductType, Attribute aggregates
+│   │       ├── CommerceCore.Modules.Catalog.Application/ # Catalog CQRS Commands, Queries, Handlers & Validators
+│   │       └── CommerceCore.Modules.Catalog.Infrastructure/ # Catalog-specific infrastructure implementations
 │   │
-│   ├── Platform/
-│   │   ├── CommerceCore.Platform.Contracts/            # Multi-Tenancy Contracts (ITenantContext, TenantId)
-│   │   ├── CommerceCore.Platform.ControlPlane/         # Tenant, Storefront, Membership entities & store
-│   │   └── CommerceCore.Platform.Identity/             # TenantResolutionMiddleware & Identity Extensions
+│   ├── Infrastructure/
+│   │   ├── CommerceCore.Infrastructure/                # System implementations (SystemClock)
+│   │   └── CommerceCore.Persistence/                   # PostgreSQL EF Core 10 DbContext, RLS Migrations, Interceptors
 │   │
 │   └── Presentation/
-│       └── CommerceCore.Api/                           # ASP.NET Core Minimal API Presentation Layer
-│           ├── Common/                                 # GlobalExceptionHandler, Security & Health checks
-│           ├── Configuration/                          # RateLimiting, Security, Observability, Health extensions
-│           ├── Endpoints/V1/
-│           │   ├── Products/                           # Product & Variant Minimal API Route Endpoints
-│           │   └── ProductTypes/                       # ProductType & Attribute Minimal API Route Endpoints
-│           ├── Identity/                               # AuthorizationPolicies, HttpCurrentUser
-│           └── Program.cs                              # Application Composition Root
+│       └── CommerceCore.Api/                           # Minimal APIs, RateLimiting, Security, Observability, Program.cs
 │
 └── tests/
     ├── CommerceCore.Domain.UnitTests/                  # 149 Tests: Domain entities, invariants, value objects
@@ -232,7 +203,7 @@ CommerceCore/
 
 ---
 
-## Technology Stack
+## Technology Matrix
 
 | Technology / Library | Version | Purpose |
 |---|---|---|
@@ -282,7 +253,7 @@ Inherits `BaseEntity<ProductVariantId>`:
 
 ---
 
-### 2. ProductType Aggregate & Dynamic Attribute Schema
+### 2. ProductType & Dynamic Attribute Schema Engine
 
 Inherits `AggregateRoot<ProductTypeId>`:
 - **Identity**: `ProductTypeId` (UUIDv7).
@@ -301,7 +272,7 @@ Inherits `AggregateRoot<ProductTypeId>`:
 
 ---
 
-### 3. Platform & Multi-Tenancy Entities
+### 3. Platform Control Plane & Multi-Tenancy
 
 - **`Tenant`**: Represents the isolated organization (`Id`, `Name`, `Slug`, `Status`, `CreatedAtUtc`).
 - **`Storefront`**: E-commerce sales channel mapped to a tenant (`Id`, `TenantId`, `HostName`, `MarketCode`, `DefaultLocale`, `IsActive`).
@@ -309,7 +280,7 @@ Inherits `AggregateRoot<ProductTypeId>`:
 
 ---
 
-### 4. Value Objects
+### 4. Core Value Objects
 
 - **`Money`**: Non-negative amount, maximum scale of 4 decimal places, uppercase ISO 4217 currency code.
 - **`LanguageCode`**: RFC-compliant language tags (`en`, `az`, `en-US`).
@@ -320,9 +291,9 @@ Inherits `AggregateRoot<ProductTypeId>`:
 
 ---
 
-## Persistence & Database Design
+## Persistence & Database Architecture
 
-### Schemas and Tables
+### Relational Schemas & Tables
 
 #### `platform.tenants`
 ```sql
@@ -347,7 +318,8 @@ CREATE TABLE platform.storefronts (
     default_locale varchar(20) NOT NULL,
     is_active boolean NOT NULL,
     CONSTRAINT pk_storefronts PRIMARY KEY (id),
-    CONSTRAINT fk_storefronts_tenants FOREIGN KEY (tenant_id) REFERENCES platform.tenants (id) ON DELETE CASCADE
+    CONSTRAINT fk_storefronts_tenants FOREIGN KEY (tenant_id) REFERENCES platform.tenants (id) ON DELETE CASCADE,
+    CONSTRAINT ck_platform_storefronts_host_name_lowercase CHECK (host_name = lower(host_name))
 );
 CREATE UNIQUE INDEX ix_platform_storefronts_host_name ON platform.storefronts (host_name);
 ```
@@ -466,9 +438,9 @@ CREATE TABLE outbox.messages (
 
 ---
 
-### PostgreSQL Row-Level Security (RLS) Policies
+### PostgreSQL Row-Level Security (RLS) Engine
 
-Every tenant-partitioned table enables PostgreSQL RLS:
+Every tenant-partitioned table (`catalog.products`, `catalog.product_variants`, `catalog.product_types`, `catalog.attribute_definitions`, `catalog.attribute_options`, `catalog.product_type_effective_schema`, `outbox.messages`) has RLS enforced:
 
 ```sql
 ALTER TABLE catalog.products ENABLE ROW LEVEL SECURITY;
@@ -476,19 +448,19 @@ ALTER TABLE catalog.products FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation_policy ON catalog.products
     FOR ALL
-    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
-    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
 ```
 
 ---
 
-### Strategic Indexes
+### Strategic Indexing & Query Optimizations
 
 - `ix_products_tenant_status_is_deleted` on `(tenant_id, status, is_deleted)`: Fast catalog filtering.
 - `ux_product_variants_tenant_sku` on `(tenant_id, sku)` (Unique): Enforces SKU uniqueness per tenant.
 - `ux_product_variants_tenant_default_per_product` on `(tenant_id, product_id) WHERE is_default = TRUE`: Ensures only one default variant per product.
 - `ux_product_types_tenant_code` on `(tenant_id, code)` (Unique): Unique category codes per tenant.
-- `ix_product_types_path_gist` on `path USING gist`: High-performance hierarchical subtree operations.
+- `ix_product_types_path_gist` on `path USING gist`: High-performance hierarchical subtree operations (`@>`, `<@`, `~`).
 - `ix_outbox_messages_tenant_pending_occurred_on_utc` on `(tenant_id, occurred_on_utc) WHERE processed_on_utc IS NULL`: Partial index for high-speed outbox processing.
 
 ---
@@ -497,9 +469,9 @@ CREATE POLICY tenant_isolation_policy ON catalog.products
 
 ### Authentication & Scoped Authorization
 
-Endpoints enforce JWT Bearer authentication with scope-based policies:
-- `catalog.read`: Read-only access to catalog products and types.
-- `catalog.manage`: Write permissions for creating and modifying products, variants, and specifications.
+Endpoints enforce JWT Bearer authentication with scope-based authorization policies:
+- `catalog.read`: Read-only access to catalog products, variants, and product types.
+- `catalog.manage`: Write permissions for creating and modifying products, variants, prices, and specifications.
 - `catalog.schema.manage`: Administrative permissions to define product types, attributes, and options.
 
 ### Partitioned Rate Limiting
@@ -509,7 +481,7 @@ The API includes sliding-window rate limiting configured via ASP.NET Core:
 - **Permit Limits**: 300 requests/minute for read operations (`GET`), 60 requests/minute for write operations (`POST`, `PUT`, `DELETE`).
 - **Response**: Returns HTTP `429 Too Many Requests` with RFC 7807 problem details and `Retry-After` header.
 
-### Security Headers
+### Security Headers & Hardening
 
 Configured via `SecurityHeadersMiddleware`:
 - `Content-Security-Policy: default-src 'self'`
@@ -517,8 +489,9 @@ Configured via `SecurityHeadersMiddleware`:
 - `X-Frame-Options: DENY`
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
 - `Referrer-Policy: strict-origin-when-cross-origin`
+- Server Header stripped from Kestrel response (`AddServerHeader = false`).
 
-### OpenTelemetry & Health Checks
+### OpenTelemetry & Health Probes
 
 - **Tracing & Metrics**: Integrated with ASP.NET Core, HttpClient, and Runtime meters exporting via OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT`).
 - **Liveness Probe**: `/health/live` returns HTTP 200 indicating the process is running.
@@ -526,18 +499,18 @@ Configured via `SecurityHeadersMiddleware`:
 
 ---
 
-## API Endpoints Reference
+## API Reference & Contracts
 
-### Product Endpoints
+### Product & Variant Endpoints
 
 Base route: `/api/products`
 
 | Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| `POST` | `/api/products` | `catalog.manage` | Create a new product |
-| `GET` | `/api/products/{productId}` | `catalog.read` | Get product details with specifications |
-| `POST` | `/api/products/{productId}/activate` | `catalog.manage` | Activate product |
-| `POST` | `/api/products/{productId}/deactivate` | `catalog.manage` | Deactivate product |
+| `POST` | `/api/products` | `catalog.manage` | Create a new product in draft status |
+| `GET` | `/api/products/{productId}` | `catalog.read` | Get product details with dynamic specifications |
+| `POST` | `/api/products/{productId}/activate` | `catalog.manage` | Activate product (requires active default variant) |
+| `POST` | `/api/products/{productId}/deactivate` | `catalog.manage` | Deactivate active product |
 | `POST` | `/api/products/{productId}/archive` | `catalog.manage` | Archive (soft delete) product |
 | `POST` | `/api/products/{productId}/restore` | `catalog.manage` | Restore an archived product |
 | `PUT` | `/api/products/{productId}/name` | `catalog.manage` | Update localized product name |
@@ -568,8 +541,8 @@ Base route: `/api/product-types`
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health/live` | Liveness health probe |
-| `GET` | `/health/ready` | Readiness probe (verifies PostgreSQL connectivity) |
+| `GET` | `/health/live` | Liveness health probe (returns 200 OK) |
+| `GET` | `/health/ready` | Readiness probe (verifies PostgreSQL database connection) |
 
 ---
 
@@ -643,9 +616,9 @@ Base route: `/api/product-types`
 
 ---
 
-## Error Handling & Problem Details
+## Error Handling & RFC 7807 Problem Details
 
-Errors strictly adhere to **RFC 7807 Problem Details** format with unique `traceId` correlation tags:
+All application errors strictly adhere to the **RFC 7807 Problem Details** specification with unique `traceId` correlation tags:
 
 #### Validation Error (`400 Bad Request`)
 ```json
@@ -703,7 +676,7 @@ cd CommerceCore
 ```
 
 ### 2. Start PostgreSQL & pgAdmin
-Start containerized PostgreSQL 18.6 and pgAdmin 4:
+Launch containerized PostgreSQL 18.6 and pgAdmin 4:
 ```bash
 docker compose up -d
 ```
@@ -711,7 +684,7 @@ docker compose up -d
 - **pgAdmin 4**: `http://localhost:5050` (Email: `admin@commercecore.com`, Password: `Admin123!`)
 
 ### 3. Apply EF Core Database Migrations
-Restore local tools and update the database:
+Restore local tools and apply code-first migrations:
 ```bash
 dotnet tool restore
 dotnet ef database update --project src/Infrastructure/CommerceCore.Persistence --startup-project src/Presentation/CommerceCore.Api
@@ -726,7 +699,7 @@ OpenAPI documentation is available at `/openapi/v1.json`.
 
 ---
 
-## Testing Strategy
+## Testing Strategy & Quality Assurance
 
 The repository includes a comprehensive, multi-tiered testing suite with **225 passing automated tests**:
 
@@ -766,7 +739,7 @@ dotnet test
 
 ---
 
-## Design Patterns & Engineering Practices
+## Engineering Practices & Design Patterns
 
 - **Modular Monolith**: Clear module and package boundaries allowing independent module evolution and straightforward future microservice extraction.
 - **Clean Architecture & DDD**: Pure domain model, explicit Aggregate Roots, encapsulated business invariants, and immutable Value Objects.

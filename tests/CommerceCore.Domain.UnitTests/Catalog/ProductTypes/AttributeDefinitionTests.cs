@@ -197,7 +197,7 @@ public sealed class AttributeDefinitionTests
 
     private static AttributeDefinition Create(
         AttributeDataType dataType = AttributeDataType.Text,
-        AttributeScope scope = AttributeScope.ProductSpecification, 
+        AttributeScope scope = AttributeScope.ProductSpecification,
         bool isRequired = false,
         decimal? minimumValue = null,
         decimal? maximumValue = null,

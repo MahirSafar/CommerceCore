@@ -19,9 +19,9 @@ public abstract class SoftDeletableAggregateRoot<TKey>
     public DateTimeOffset? DeletedAtUtc { get; private set; }
     public string? DeletedBy { get; private set; }
 
-    protected bool MarkAsDeletedCore(
-    DateTimeOffset deletedAtUtc,
-    string? deletedBy)
+    protected bool MarkAsDeletedCore(
+      DateTimeOffset deletedAtUtc,
+      string? deletedBy)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(
           deletedAtUtc,
