@@ -30,7 +30,7 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
 
         return await _dbContext.Set<Storefront>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.HostName.ToLower() == normalizedHost, cancellationToken);
+            .FirstOrDefaultAsync(s => s.HostName == normalizedHost, cancellationToken);
     }
 
     public async Task<TenantMembership?> GetActiveMembershipAsync(

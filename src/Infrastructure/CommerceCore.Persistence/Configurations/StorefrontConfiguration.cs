@@ -9,7 +9,12 @@ public sealed class StorefrontConfiguration : IEntityTypeConfiguration<Storefron
 {
     public void Configure(EntityTypeBuilder<Storefront> builder)
     {
-        builder.ToTable("storefronts", schema: "platform");
+        builder.ToTable(
+            "storefronts",
+            schema: "platform",
+            tableBuilder => tableBuilder.HasCheckConstraint(
+                "ck_platform_storefronts_host_name_lowercase",
+                "host_name = lower(host_name)"));
 
         builder.HasKey(storefront => storefront.Id);
 
