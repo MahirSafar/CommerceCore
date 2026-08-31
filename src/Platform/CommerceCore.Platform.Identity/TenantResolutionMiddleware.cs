@@ -11,10 +11,10 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext context, IPlatformTenantStore tenantStore)
     {
-        var path = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
+        var path = context.Request.Path.Value ?? string.Empty;
 
         // Skip non-API or public discovery endpoints (like swagger, health, scalar)
-        if (!path.StartsWith("/api/"))
+        if (!path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;
