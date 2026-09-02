@@ -49,7 +49,7 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
                 membership =>
                     membership.TenantId == tenantId &&
                     membership.UserSubject == userSubject &&
-                    membership.Status == "Active",
+                    membership.Status == TenantMembershipStatuses.Active,
                 cancellationToken);
     }
 }

@@ -1,4 +1,4 @@
-﻿using CommerceCore.Persistence;
+using CommerceCore.Persistence;
 using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +52,7 @@ try
             Id = TenantId.New(),
             Slug = tenantSlug,
             Name = tenantName,
-            Status = "Active",
+            Status = TenantStatuses.Active,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -112,12 +112,12 @@ try
         {
             TenantId = tenant.Id,
             UserSubject = adminSubject,
-            Role = "Admin",
-            Status = "Active"
+            Role = TenantMembershipRoles.Admin,
+            Status = TenantMembershipStatuses.Active
         });
     }
-    else if (existingMembership.Role != "Admin" ||
-             existingMembership.Status != "Active")
+    else if (existingMembership.Role != TenantMembershipRoles.Admin ||
+             existingMembership.Status != TenantMembershipStatuses.Active)
     {
         throw new InvalidOperationException(
             $"User subject '{adminSubject}' already has incompatible membership.");
