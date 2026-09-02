@@ -49,12 +49,50 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             Id = tenantId,
             Slug = $"integration-{tenantId.Value:N}",
             Name = "Integration Test Tenant",
-            Status = "Active"
+            Status = TenantStatuses.Active
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return tenantId;
+    }
+
+    public async Task CreateMembershipAsync(
+        TenantId tenantId,
+        string userSubject,
+        string role = TenantMembershipRoles.Admin,
+        string status = TenantMembershipStatuses.Active,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        dbContext.TenantMemberships.Add(new TenantMembership
+        {
+            TenantId = tenantId,
+            UserSubject = userSubject,
+            Role = role,
+            Status = status
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetTenantStatusAsync(
+        TenantId tenantId,
+        string status,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        var tenant = await dbContext.Tenants.SingleAsync(
+            t => t.Id == tenantId,
+            cancellationToken);
+
+        tenant.Status = status;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask InitializeAsync()

@@ -43,13 +43,15 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
             return null;
         }
 
-        return await _dbContext.Set<TenantMembership>()
-            .AsNoTracking()
-            .SingleOrDefaultAsync(
-                membership =>
-                    membership.TenantId == tenantId &&
-                    membership.UserSubject == userSubject &&
-                    membership.Status == TenantMembershipStatuses.Active,
-                cancellationToken);
+        return await (
+            from membership in _dbContext.Set<TenantMembership>().AsNoTracking()
+            join tenant in _dbContext.Set<Tenant>().AsNoTracking()
+                on membership.TenantId equals tenant.Id
+            where membership.TenantId == tenantId &&
+                  membership.UserSubject == userSubject &&
+                  membership.Status == TenantMembershipStatuses.Active &&
+                  tenant.Status == TenantStatuses.Active
+            select membership)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 }
