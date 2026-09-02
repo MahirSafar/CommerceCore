@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CommerceCore.Persistence;
 
-public sealed class CommerceCoreDbContext(DbContextOptions<CommerceCoreDbContext> options) 
+public sealed class CommerceCoreDbContext(DbContextOptions<CommerceCoreDbContext> options)
     : DbContext(options), ICommerceCoreDbContext
 {
     public DbSet<Product> Products => Set<Product>();

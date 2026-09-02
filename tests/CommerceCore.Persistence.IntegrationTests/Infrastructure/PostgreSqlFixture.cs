@@ -49,12 +49,50 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             Id = tenantId,
             Slug = $"integration-{tenantId.Value:N}",
             Name = "Integration Test Tenant",
-            Status = "Active"
+            Status = TenantStatuses.Active
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return tenantId;
+    }
+
+    public async Task CreateMembershipAsync(
+        TenantId tenantId,
+        string userSubject,
+        string role = TenantMembershipRoles.Admin,
+        string status = TenantMembershipStatuses.Active,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        dbContext.TenantMemberships.Add(new TenantMembership
+        {
+            TenantId = tenantId,
+            UserSubject = userSubject,
+            Role = role,
+            Status = status
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetTenantStatusAsync(
+        TenantId tenantId,
+        string status,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        var tenant = await dbContext.Tenants.SingleAsync(
+            t => t.Id == tenantId,
+            cancellationToken);
+
+        tenant.Status = status;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async ValueTask InitializeAsync()
@@ -110,7 +148,10 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
                 GRANT USAGE ON SCHEMA catalog, outbox, platform TO commercecore_app;
                 GRANT SELECT, INSERT, UPDATE, DELETE
-                    ON ALL TABLES IN SCHEMA catalog, outbox, platform
+                    ON ALL TABLES IN SCHEMA catalog, outbox
+                    TO commercecore_app;
+                GRANT SELECT
+                    ON ALL TABLES IN SCHEMA platform
                     TO commercecore_app;
                 GRANT USAGE, SELECT
                     ON ALL SEQUENCES IN SCHEMA catalog, outbox, platform
@@ -135,7 +176,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         services.AddSingleton<ITenantContext>(sp => sp.GetRequiredService<TestTenantContext>());
 
         services.AddPersistence(applicationConnectionString);
-        
+
         services.AddCatalogApplication();
 
         Services = services.BuildServiceProvider();

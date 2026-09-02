@@ -1,0 +1,21 @@
+root = true
+
+# Catalog schema type adları qəsdən wire/schema contract ilə eynidir.
+[src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/Catalog/Attributes/ValueObjects/AttributeValue.cs]
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1720.severity = none
+
+[src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/Catalog/ProductTypes/Enums/AttributeDataType.cs]
+dotnet_diagnostic.CA1720.severity = none
+
+# xUnit test method names intentionally use underscores for readability.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1068.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+# EF Core migration code is generated.
+[src/Infrastructure/CommerceCore.Persistence/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none

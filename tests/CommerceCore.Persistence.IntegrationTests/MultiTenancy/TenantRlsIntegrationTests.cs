@@ -9,6 +9,7 @@ using CommerceCore.Persistence.Outbox;
 using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace CommerceCore.Persistence.IntegrationTests.MultiTenancy;
 
@@ -333,5 +334,25 @@ public sealed class TenantRlsIntegrationTests
             await Assert.ThrowsAnyAsync<DbUpdateException>(
                 () => dbA.SaveChangesAsync(cancellationToken));
         }
+    }
+
+    [Fact]
+    public async Task AppRole_Cannot_Modify_Platform_Data()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        _fixture.SetTenantForCurrentTest();
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        PostgresException exception = await Assert.ThrowsAsync<PostgresException>(
+            () => db.Database.ExecuteSqlRawAsync(
+                "UPDATE platform.storefronts SET is_active = is_active",
+                cancellationToken));
+
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, exception.SqlState);
     }
 }

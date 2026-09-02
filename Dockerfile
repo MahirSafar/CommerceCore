@@ -5,6 +5,11 @@ COPY src/Core/CommerceCore.Domain/CommerceCore.Domain.csproj src/Core/CommerceCo
 COPY src/Core/CommerceCore.Application/CommerceCore.Application.csproj src/Core/CommerceCore.Application/
 COPY src/Infrastructure/CommerceCore.Infrastructure/CommerceCore.Infrastructure.csproj src/Infrastructure/CommerceCore.Infrastructure/
 COPY src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj src/Infrastructure/CommerceCore.Persistence/
+COPY src/Platform/CommerceCore.Platform.Contracts/CommerceCore.Platform.Contracts.csproj src/Platform/CommerceCore.Platform.Contracts/
+COPY src/Platform/CommerceCore.Platform.ControlPlane/CommerceCore.Platform.ControlPlane.csproj src/Platform/CommerceCore.Platform.ControlPlane/
+COPY src/Platform/CommerceCore.Platform.Identity/CommerceCore.Platform.Identity.csproj src/Platform/CommerceCore.Platform.Identity/
+COPY src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/CommerceCore.Modules.Catalog.Domain.csproj src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/
+COPY src/Modules/Catalog/CommerceCore.Modules.Catalog.Application/CommerceCore.Modules.Catalog.Application.csproj src/Modules/Catalog/CommerceCore.Modules.Catalog.Application/
 COPY src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj src/Presentation/CommerceCore.Api/
 
 RUN dotnet restore src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj

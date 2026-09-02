@@ -3,14 +3,23 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace CommerceCore.Api.Common.Errors;
 
-public sealed class GlobalExceptionHandler(
+public sealed partial class GlobalExceptionHandler(
     ILogger<GlobalExceptionHandler> logger)
     : IExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger = logger;
+
+    [LoggerMessage(
+        LogLevel.Error,
+        "Unhandled exception. TraceId: {TraceId}")]
+    private static partial void LogUnhandledException(
+        ILogger logger,
+        Exception exception,
+        string traceId);
 
     private static Task WriteProblemAsync<TProblemDetails>(
         HttpContext httpContext,
@@ -143,6 +152,24 @@ public sealed class GlobalExceptionHandler(
 
         return WriteProblemAsync(httpContext, problem, cancellationToken);
     }
+
+    private static Task WriteUniqueConstraintProblemAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        ProblemDetails problem = new()
+        {
+            Type = "/problems/unique-constraint-conflict",
+            Title = "A resource with the same unique value already exists.",
+            Status = StatusCodes.Status409Conflict,
+            Instance = httpContext.Request.Path
+        };
+
+        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        return WriteProblemAsync(httpContext, problem, cancellationToken);
+    }
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -173,6 +200,16 @@ public sealed class GlobalExceptionHandler(
 
                 return true;
 
+            case DbUpdateException
+            {
+                InnerException: PostgresException { SqlState: "23505" }
+            }:
+                await WriteUniqueConstraintProblemAsync(
+                    httpContext,
+                    cancellationToken);
+
+                return true;
+
             case DbUpdateConcurrencyException:
                 await WriteConcurrencyProblemAsync(
                     httpContext,
@@ -180,9 +217,9 @@ public sealed class GlobalExceptionHandler(
 
                 return true;
             default:
-                _logger.LogError(
+                LogUnhandledException(
+                    _logger,
                     exception,
-                    "Unhandled exception. TraceId: {TraceId}",
                     httpContext.TraceIdentifier);
 
                 await WriteUnexpectedProblemAsync(

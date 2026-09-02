@@ -6,6 +6,6 @@ public sealed class DeactivateProductCommandValidator : AbstractValidator<Deacti
 {
     public DeactivateProductCommandValidator()
     {
-        RuleFor(command => command.ProductId).NotEmpty(); 
+        RuleFor(command => command.ProductId).NotEmpty();
     }
 }

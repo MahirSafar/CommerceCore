@@ -10,7 +10,7 @@ public sealed record ProductCreatedDomainEvent : DomainEvent
         DateTimeOffset occurredOnUtc)
         : base(occurredOnUtc)
     {
-        if(productId == default)
+        if (productId == default)
             throw new ArgumentException("Product ID cannot be empty.", nameof(productId));
 
         ProductId = productId;

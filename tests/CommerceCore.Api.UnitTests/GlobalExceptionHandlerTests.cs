@@ -1,7 +1,9 @@
-﻿using CommerceCore.Api.Common.Errors;
+using CommerceCore.Api.Common.Errors;
 using CommerceCore.Domain.Catalog.Products.Exceptions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
 
 namespace CommerceCore.Api.UnitTests;
 
@@ -44,6 +46,33 @@ public sealed class GlobalExceptionHandlerTests
         Assert.True(handled);
         Assert.Equal(
             StatusCodes.Status422UnprocessableEntity,
+            context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WithUniqueConstraintViolation_ReturnsConflict()
+    {
+        DefaultHttpContext context = new();
+
+        GlobalExceptionHandler handler = new(
+            NullLogger<GlobalExceptionHandler>.Instance);
+
+        DbUpdateException exception = new(
+            "Duplicate value.",
+            new PostgresException(
+                "duplicate key value violates unique constraint",
+                "ERROR",
+                "ERROR",
+                "23505"));
+
+        bool handled = await handler.TryHandleAsync(
+            context,
+            exception,
+            CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(
+            StatusCodes.Status409Conflict,
             context.Response.StatusCode);
     }
 }

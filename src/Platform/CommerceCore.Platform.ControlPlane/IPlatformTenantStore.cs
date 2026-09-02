@@ -7,6 +7,8 @@ public interface IPlatformTenantStore
 {
     Task<Tenant?> GetTenantByIdAsync(TenantId tenantId, CancellationToken cancellationToken = default);
     Task<Storefront?> GetStorefrontByHostAsync(string hostName, CancellationToken cancellationToken = default);
-    Task<TenantMembership?> GetMembershipByUserSubjectAsync(string userSubject, CancellationToken cancellationToken = default);
-    Task<Tenant?> GetTenantByPartnerClientIdAsync(string clientId, CancellationToken cancellationToken = default);
+    Task<TenantMembership?> GetActiveMembershipAsync(
+        TenantId tenantId,
+        string userSubject,
+        CancellationToken cancellationToken = default);
 }

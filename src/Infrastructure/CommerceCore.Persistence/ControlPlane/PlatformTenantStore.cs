@@ -30,27 +30,28 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
 
         return await _dbContext.Set<Storefront>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.HostName.ToLower() == normalizedHost, cancellationToken);
+            .FirstOrDefaultAsync(s => s.HostName == normalizedHost, cancellationToken);
     }
 
-    public async Task<TenantMembership?> GetMembershipByUserSubjectAsync(string userSubject, CancellationToken cancellationToken = default)
+    public async Task<TenantMembership?> GetActiveMembershipAsync(
+        TenantId tenantId,
+        string userSubject,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(userSubject))
+        {
             return null;
+        }
 
-        return await _dbContext.Set<TenantMembership>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.UserSubject == userSubject && m.Status == "Active", cancellationToken);
-    }
-
-    public async Task<Tenant?> GetTenantByPartnerClientIdAsync(string clientId, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(clientId))
-            return null;
-
-        // Partner client id mapping: slug or direct match
-        return await _dbContext.Set<Tenant>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Slug == clientId, cancellationToken);
+        return await (
+            from membership in _dbContext.Set<TenantMembership>().AsNoTracking()
+            join tenant in _dbContext.Set<Tenant>().AsNoTracking()
+                on membership.TenantId equals tenant.Id
+            where membership.TenantId == tenantId &&
+                  membership.UserSubject == userSubject &&
+                  membership.Status == TenantMembershipStatuses.Active &&
+                  tenant.Status == TenantStatuses.Active
+            select membership)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 }

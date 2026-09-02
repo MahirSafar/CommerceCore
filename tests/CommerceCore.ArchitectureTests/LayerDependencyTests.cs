@@ -26,6 +26,12 @@ public sealed class LayerDependencyTests
     private static readonly Assembly PlatformContractsAssembly =
         LoadAssembly("CommerceCore.Platform.Contracts");
 
+    private static readonly Assembly PlatformControlPlaneAssembly =
+        LoadAssembly("CommerceCore.Platform.ControlPlane");
+
+    private static readonly Assembly PlatformIdentityAssembly =
+        LoadAssembly("CommerceCore.Platform.Identity");
+
     [Fact]
     public void CatalogDomain_Must_Not_Depend_On_Outer_Layers()
     {
@@ -55,6 +61,41 @@ public sealed class LayerDependencyTests
             "CommerceCore.Api",
             "Microsoft.EntityFrameworkCore",
             "Microsoft.AspNetCore");
+    }
+
+    [Fact]
+    public void PlatformControlPlane_Must_Not_Depend_On_Outer_Layers()
+    {
+        AssertHasNoDependencyOn(
+            PlatformControlPlaneAssembly,
+            "CommerceCore.Domain",
+            "CommerceCore.Application",
+            "CommerceCore.Modules.Catalog.Domain",
+            "CommerceCore.Modules.Catalog.Application",
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "Microsoft.EntityFrameworkCore",
+            "Npgsql",
+            "Microsoft.AspNetCore");
+    }
+
+    [Fact]
+    public void PlatformIdentity_Must_Not_Depend_On_Outer_Layers()
+    {
+        AssertHasNoDependencyOn(
+            PlatformIdentityAssembly,
+            "CommerceCore.Domain",
+            "CommerceCore.Application",
+            "CommerceCore.Modules.Catalog.Domain",
+            "CommerceCore.Modules.Catalog.Application",
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "Microsoft.EntityFrameworkCore",
+            "Npgsql",
+            "FluentValidation",
+            "Mediator");
     }
 
     [Fact]
