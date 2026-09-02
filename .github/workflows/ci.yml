@@ -48,6 +48,18 @@ jobs:
           --configuration Release
           --no-build
 
+      - name: Verify EF Core migration script
+        env:
+          COMMERCECORE_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
+        run: |
+          dotnet ef migrations script \
+            --idempotent \
+            --configuration Release \
+            --no-build \
+            --output "$RUNNER_TEMP/commercecore-migrations.sql" \
+            --project src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj \
+            --startup-project src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj
+
       - name: Build API container image
         run: docker build --tag commercecore-api:ci .
 
