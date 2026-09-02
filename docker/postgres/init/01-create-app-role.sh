@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${COMMERCECORE_APP_PASSWORD:?COMMERCECORE_APP_PASSWORD must be set}"
+
+psql \
+  --username "$POSTGRES_USER" \
+  --dbname "$POSTGRES_DB" \
+  --set ON_ERROR_STOP=1 \
+  --set app_password="$COMMERCECORE_APP_PASSWORD" \
+  --set database_name="$POSTGRES_DB" <<'SQL'
+CREATE ROLE commercecore_app
+  LOGIN
+  PASSWORD :'app_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+
+CREATE SCHEMA IF NOT EXISTS catalog;
+CREATE SCHEMA IF NOT EXISTS outbox;
+CREATE SCHEMA IF NOT EXISTS platform;
+
+GRANT CONNECT ON DATABASE :"database_name" TO commercecore_app;
+GRANT USAGE ON SCHEMA catalog, outbox, platform TO commercecore_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA catalog
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO commercecore_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA outbox
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO commercecore_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA platform
+  GRANT SELECT ON TABLES TO commercecore_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA catalog
+  GRANT USAGE, SELECT ON SEQUENCES TO commercecore_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA outbox
+  GRANT USAGE, SELECT ON SEQUENCES TO commercecore_app;
+SQL

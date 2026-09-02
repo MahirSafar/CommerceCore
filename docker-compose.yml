@@ -8,12 +8,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      COMMERCECORE_APP_PASSWORD: ${COMMERCECORE_APP_PASSWORD:?COMMERCECORE_APP_PASSWORD must be set}
 
     ports:
       - "5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
 
   pgadmin:
     image: dpage/pgadmin4:9.17
