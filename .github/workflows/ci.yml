@@ -40,7 +40,7 @@ jobs:
       - name: Verify EF Core migration model is current
         env:
           DOTNET_ENVIRONMENT: Development
-          ConnectionStrings__CommerceCoreDatabase: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
+          COMMERCECORE_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
         run: >
           dotnet ef migrations has-pending-model-changes
           --project src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj
