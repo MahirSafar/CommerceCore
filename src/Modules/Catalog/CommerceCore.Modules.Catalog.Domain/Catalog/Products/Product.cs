@@ -214,6 +214,17 @@ public sealed class Product : SoftDeletableAggregateRoot<ProductId>
     {
         EnsureNotArchived();
         ArgumentNullException.ThrowIfNull(price);
+
+        if (!string.Equals(
+                Price.Currency,
+                price.Currency,
+                StringComparison.Ordinal))
+        {
+            throw new ProductDomainException(
+                "product.variant_currency_must_match_product",
+                "A variant's currency must match the product's base currency.");
+        }
+
         ArgumentNullException.ThrowIfNull(options);
 
         if (_variants.Any(variant => variant.Sku == sku))

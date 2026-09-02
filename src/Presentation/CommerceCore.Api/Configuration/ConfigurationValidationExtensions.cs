@@ -24,13 +24,25 @@ internal static class ConfigurationValidationExtensions
 
         string? authenticationAuthority = builder.Configuration["Authentication:Schemes:Bearer:Authority"];
         string? authenticationAudience = builder.Configuration["Authentication:Schemes:Bearer:Audience"];
+        string? validIssuer = builder.Configuration["Authentication:Schemes:Bearer:ValidIssuer"];
+        string? validAudience = builder.Configuration["Authentication:Schemes:Bearer:ValidAudience"];
+        bool hasValidAudiences = builder.Configuration.GetSection("Authentication:Schemes:Bearer:ValidAudiences").Exists() ||
+                                 !string.IsNullOrWhiteSpace(builder.Configuration["Authentication:Schemes:Bearer:ValidAudiences:0"]);
+
+        bool hasAuthorityAndAudience =
+            !string.IsNullOrWhiteSpace(authenticationAuthority) &&
+            !string.IsNullOrWhiteSpace(authenticationAudience);
+
+        bool hasIssuerAndAudience =
+            !string.IsNullOrWhiteSpace(validIssuer) &&
+            (!string.IsNullOrWhiteSpace(validAudience) || hasValidAudiences);
 
         if (!builder.Environment.IsDevelopment() &&
-            (string.IsNullOrWhiteSpace(authenticationAuthority) ||
-             string.IsNullOrWhiteSpace(authenticationAudience)))
+            !hasAuthorityAndAudience &&
+            !hasIssuerAndAudience)
         {
             throw new InvalidOperationException(
-                "Bearer Authority and Audience must be configured outside Development.");
+                "Configure either Bearer Authority and Audience, or ValidIssuer and ValidAudience(s) outside Development.");
         }
     }
 }
