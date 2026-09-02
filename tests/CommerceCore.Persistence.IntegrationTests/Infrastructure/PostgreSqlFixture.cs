@@ -110,7 +110,10 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
                 GRANT USAGE ON SCHEMA catalog, outbox, platform TO commercecore_app;
                 GRANT SELECT, INSERT, UPDATE, DELETE
-                    ON ALL TABLES IN SCHEMA catalog, outbox, platform
+                    ON ALL TABLES IN SCHEMA catalog, outbox
+                    TO commercecore_app;
+                GRANT SELECT
+                    ON ALL TABLES IN SCHEMA platform
                     TO commercecore_app;
                 GRANT USAGE, SELECT
                     ON ALL SEQUENCES IN SCHEMA catalog, outbox, platform
