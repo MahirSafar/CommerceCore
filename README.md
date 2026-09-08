@@ -7,11 +7,12 @@
 [![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4?style=flat&logo=dotnet)](https://docs.microsoft.com/ef/core/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith%20%7C%20Clean%20%7C%20DDD%20%7C%20CQRS-blueviolet?style=flat)]()
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Pool%20%2B%20PostgreSQL%20RLS-orange?style=flat)]()
-[![Tests](https://img.shields.io/badge/Tests-225%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
+[![Security](https://img.shields.io/badge/Security-Least--Privilege%20App%20Role%20%7C%20RLS%20%7C%20JWT-red?style=flat)]()
+[![Tests](https://img.shields.io/badge/Tests-234%2B%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
 
 **CommerceCore** is an enterprise-grade, high-performance modular e-commerce backend platform built with **.NET 10**, engineered around the principles of **Modular Monolith**, **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS (Command Query Responsibility Segregation)**.
 
-Engineered for extreme reliability, throughput, and multi-tenant isolation, the system provides native database-level **PostgreSQL Row-Level Security (RLS)**, compile-time source-generated mediation, a dynamic attribute & schema compilation engine, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, transactional outbox messaging, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
+Engineered for extreme reliability, throughput, and multi-tenant isolation, the system provides native database-level **PostgreSQL Row-Level Security (RLS)**, least-privilege runtime database roles, compile-time source-generated mediation, a dynamic attribute & schema compilation engine, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, transactional outbox messaging, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
 
 ---
 
@@ -19,6 +20,7 @@ Engineered for extreme reliability, throughput, and multi-tenant isolation, the 
 
 - [Architectural Blueprint](#architectural-blueprint)
 - [Multi-Tenancy & Row-Level Security (RLS)](#multi-tenancy--row-level-security-rls)
+- [Least-Privilege Database Security](#least-privilege-database-security)
 - [Key Engineering Highlights](#key-engineering-highlights)
 - [Solution & Project Decomposition](#solution--project-decomposition)
 - [Technology Matrix](#technology-matrix)
@@ -32,17 +34,20 @@ Engineered for extreme reliability, throughput, and multi-tenant isolation, the 
   - [PostgreSQL Row-Level Security (RLS) Engine](#postgresql-row-level-security-rls-engine)
   - [Strategic Indexing & Query Optimizations](#strategic-indexing--query-optimizations)
 - [Security, Resilience & Observability](#security-resilience--observability)
+  - [Rate Limiting Before Tenant Resolution (DoS Mitigation)](#rate-limiting-before-tenant-resolution-dos-mitigation)
   - [Authentication & Scoped Authorization](#authentication--scoped-authorization)
-  - [Partitioned Rate Limiting](#partitioned-rate-limiting)
-  - [Security Headers & Hardening](#security-headers--hardening)
+  - [Security Headers & Kestrel Hardening](#security-headers--kestrel-hardening)
   - [OpenTelemetry & Health Probes](#opentelemetry--health-probes)
+  - [High-Performance Logging](#high-performance-logging)
 - [API Reference & Contracts](#api-reference--contracts)
   - [Product & Variant Endpoints](#product--variant-endpoints)
   - [Product Type & Attribute Endpoints](#product-type--attribute-endpoints)
   - [Health Check Endpoints](#health-check-endpoints)
   - [Sample Payloads & Responses](#sample-payloads--responses)
 - [Error Handling & RFC 7807 Problem Details](#error-handling--rfc-7807-problem-details)
+- [CLI Tooling: CommerceCore.Bootstrap](#cli-tooling-commercecorebootstrap)
 - [Getting Started & Local Setup](#getting-started--local-setup)
+- [CI/CD Automation & Quality Gates](#cicd-automation--quality-gates)
 - [Testing Strategy & Quality Assurance](#testing-strategy--quality-assurance)
 - [Engineering Practices & Design Patterns](#engineering-practices--design-patterns)
 
@@ -57,8 +62,9 @@ CommerceCore employs a **Modular Monolith** architecture combined with **Clean A
                               │              Presentation Layer              │
                               │             (CommerceCore.Api)               │
                               │  - Minimal API Route Endpoints (V1)          │
+                              │  - Rate Limiter (Applied before Tenant Res)  │
                               │  - Multi-Tenant & Security Middleware        │
-                              │  - Rate Limiter & Observability Instrumentation│
+                              │  - OpenTelemetry Tracing & Metrics Export    │
                               │  - RFC 7807 Problem Details Exception Handler│
                               └──────────────────────┬───────────────────────┘
                                                      │
@@ -66,25 +72,25 @@ CommerceCore employs a **Modular Monolith** architecture combined with **Clean A
                     │                                                                 │
      ┌──────────────▼──────────────────────────────┐   ┌──────────────────────────────▼──────────────┐
      │              Platform Module                │   │                Catalog Module               │
-     │  - CommerceCore.Platform.Contracts          │   │  - CommerceCore.Modules.Catalog.Contracts   │
-     │  - CommerceCore.Platform.ControlPlane       │   │  - CommerceCore.Modules.Catalog.Domain      │
-     │  - CommerceCore.Platform.Identity           │   │  - CommerceCore.Modules.Catalog.Application │
-     └──────────────────────┬──────────────────────┘   │  - CommerceCore.Modules.Catalog.Infrastr... │
-                            │                          └──────────────────────┬──────────────────────┘
+     │  - CommerceCore.Platform.Contracts          │   │  - CommerceCore.Modules.Catalog.Domain      │
+     │  - CommerceCore.Platform.ControlPlane       │   │  - CommerceCore.Modules.Catalog.Application │
+     │  - CommerceCore.Platform.Identity           │   └──────────────────────┬──────────────────────┘
+     └──────────────────────┬──────────────────────┘                          │
+                            │                                                 │
                             └────────────────────────┬────────────────────────┘
                                                      │
                               ┌──────────────────────▼───────────────────────┐
                               │                  Core Layer                  │
                               │  - CommerceCore.Domain (Base Entities, VOs)  │
-                              │  - CommerceCore.Application (CQRS Behaviors) │
-                              │  - Source-Generated Mediator Pipeline        │
+                              │  - CommerceCore.Application (CQRS Pipelines) │
+                              │  - Source-Generated Mediator Handlers        │
                               └──────────────────────┬───────────────────────┘
                                                      │
                               ┌──────────────────────▼───────────────────────┐
                               │             Infrastructure Layer             │
                               │  - CommerceCore.Persistence (EF Core 10,     │
                               │    PostgreSQL RLS, Outbox, Interceptors)     │
-                              │  - CommerceCore.Infrastructure (Clock, System)│
+                              │  - CommerceCore.Infrastructure (Clock)       │
                               └──────────────────────────────────────────────┘
 ```
 
@@ -92,10 +98,9 @@ CommerceCore employs a **Modular Monolith** architecture combined with **Clean A
 
 | Layer / Module | Scope & Responsibilities | Dependency Constraints |
 |---|---|---|
-| **Domain** | Pure business models, aggregates, immutable value objects, domain events, domain exceptions, and invariant rules. | **Zero dependencies** on external frameworks, ORMs, or IO libraries. |
-| **Application** | CQRS use cases, commands, queries, mediator handlers, and validation pipeline behaviors (`ValidationBehavior`). | Depends only on **Domain**. No references to persistence, database drivers, or presentation frameworks. |
-| **Platform** | Multi-tenant isolation contracts (`ITenantContext`), tenant control plane entities, storefront resolution, and identity integration. | Shared cross-cutting foundation for all functional modules. |
-| **Catalog Module** | Full product catalog, variants, dynamic attribute definitions, option sets, taxonomy hierarchies, and schema compilation. | Modular domain and application boundaries, encapsulating catalog-specific business logic. |
+| **Domain** (`Core.Domain`, `Catalog.Domain`) | Pure business models, aggregates, immutable value objects, domain events, domain exceptions, and invariant rules. | **Zero dependencies** on external frameworks, ORMs, or IO libraries. |
+| **Application** (`Core.Application`, `Catalog.Application`) | CQRS use cases, commands, queries, mediator handlers, and validation pipeline behaviors (`ValidationBehavior`). | Depends only on **Domain**. No references to persistence, database drivers, or presentation frameworks. |
+| **Platform** (`Contracts`, `ControlPlane`, `Identity`) | Multi-tenant isolation contracts (`ITenantContext`), tenant control plane entities, storefront resolution, and identity integration. | Shared cross-cutting foundation for functional modules. Read-only at runtime by application role. |
 | **Persistence & Infra** | PostgreSQL EF Core 10 DbContext, connection interceptors (`TenantSessionInterceptor`, `AuditingSaveChangesInterceptor`, `OutboxSaveChangesInterceptor`), schema configurations, and migrations. | Implements Application abstractions using concrete PostgreSQL drivers and EF Core mappings. |
 | **Presentation (API)** | Application composition root, Minimal APIs, rate limiting, security headers, authentication, and OpenTelemetry instrumentation. | References application and infrastructure modules to compose the runtime pipeline. |
 
@@ -110,17 +115,24 @@ Incoming HTTP Request
           │
           ▼
 ┌────────────────────────────────────────────────────────────┐
-│ 1. TenantResolutionMiddleware                              │
-│    - Resolves Host from request header                     │
-│    - Matches Host against platform.storefronts (cached)    │
-│    - Extracts user subject from JWT ('sub' / NameIdentifier)│
+│ 1. RateLimitingMiddleware (Global Sliding Window)          │
+│    - Applied BEFORE tenant resolution to thwart DoS attacks│
+└─────────────────────────────┬──────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────┐
+│ 2. TenantResolutionMiddleware                              │
+│    - Resolves Host from request header (case-insensitive)  │
+│    - Matches Host against platform.storefronts             │
+│    - Extracts user subject from JWT ('sub' / NameId)       │
 │    - Verifies active membership in platform.tenant_members │
+│    - Verifies parent tenant status is TenantStatuses.Active│
 │    - Populates Scoped ITenantContext (TenantId, Storefront)│
 └─────────────────────────────┬──────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────┐
-│ 2. TenantSessionInterceptor (DbConnectionInterceptor)      │
+│ 3. TenantSessionInterceptor (DbConnectionInterceptor)      │
 │    - Intercepts EF Core database connection open           │
 │    - Executes: SELECT set_config('app.tenant_id', @id, false)│
 │    - Sets session variable for the connection lifetime     │
@@ -128,7 +140,7 @@ Incoming HTTP Request
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────┐
-│ 3. PostgreSQL Native Row-Level Security (RLS) Engine       │
+│ 4. PostgreSQL Native Row-Level Security (RLS) Engine       │
 │    - Evaluates: tenant_id = NULLIF(current_setting(        │
 │                 'app.tenant_id', true), '')::uuid          │
 │    - Applied to ALL SELECT, INSERT, UPDATE, DELETE queries │
@@ -136,8 +148,39 @@ Incoming HTTP Request
 └────────────────────────────────────────────────────────────┘
 ```
 
-- **Fail-Safe Isolation**: Even if application-level filters are bypassed, PostgreSQL RLS physically prevents any query or command from accessing another tenant's rows.
-- **Dynamic Host Routing**: Storefronts dynamically map domain names (e.g., `us.store.com`, `eu.store.com`) to specific tenants, markets, and default locales.
+- **Defense in Depth**: Even if application-level query filters are bypassed, PostgreSQL RLS physically rejects any query or mutation attempting to touch another tenant's rows.
+- **Parent Tenant Status Enforcement**: Tenant membership resolution verifies that both the membership *and* the parent tenant have active status (`TenantStatuses.Active`). Inactive or suspended tenants are immediately blocked.
+
+---
+
+## Least-Privilege Database Security
+
+CommerceCore establishes a strict separation of database privileges between runtime application execution and administrative migrations:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │            PostgreSQL Database               │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                 ┌───────────────────────┴───────────────────────┐
+                 │                                               │
+  ┌──────────────▼──────────────┐                 ┌──────────────▼──────────────┐
+  │  Runtime Application Role   │                 │   Administrative Migration   │
+  │     (commercecore_app)      │                 │            Role             │
+  │ - NOSUPERUSER, NOCREATEDB   │                 │ - Schema creation & DDL     │
+  │ - NOBYPASSRLS (enforces RLS)│                 │ - Migration execution       │
+  │ - SELECT on 'platform'      │                 │ - Bootstrap CLI operations  │
+  │ - CRUD on 'catalog', 'outbox'│                └─────────────────────────────┘
+  └─────────────────────────────┘
+```
+
+1. **Runtime App Role (`commercecore_app`)**:
+   - `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`
+   - **`platform` Schema**: Read-only (`SELECT` only). The application cannot create, update, or delete tenants, storefronts, or memberships.
+   - **`catalog` and `outbox` Schemas**: `SELECT, INSERT, UPDATE, DELETE` with RLS strictly enforced on every query.
+2. **Migration Role Separation**:
+   - `CommerceCoreDbContextFactory` reads `COMMERCECORE_MIGRATIONS_CONNECTION_STRING` for design-time migrations and DDL execution.
+   - Prevents web application connection strings from having schema alteration (DDL) privileges in production.
 
 ---
 
@@ -145,7 +188,8 @@ Incoming HTTP Request
 
 - **Compile-Time Source-Generated Mediator**: Utilizes `Mediator.SourceGenerator` for zero-reflection, high-throughput CQRS dispatching with compile-time pipeline behaviors (`ValidationBehavior`).
 - **PostgreSQL Row-Level Security (RLS)**: Automatic tenant session binding (`set_config('app.tenant_id', ...)`) ensuring bulletproof multi-tenant isolation.
-- **Explicit Product Variants**: Full support for matrix variations with custom SKUs, variant pricing, default variant assignment, and dynamic variant option bags.
+- **Least-Privilege Database Role**: Hardened runtime app role with read-only access to control plane metadata and enforced RLS.
+- **Explicit Product Variants**: Matrix variations with custom SKUs, variant pricing, currency parity validation, default variant assignment, and dynamic variant option bags.
 - **Dynamic Attribute Schema & Versioning**: Strongly-typed attributes (`Text`, `Integer`, `Decimal`, `Boolean`, `SingleSelect`, `MultiSelect`, `Measurement`) with scopes, validation bounds, enforcement states (`Draft`, `Backfilling`, `Enforced`, `Deprecated`), and compiled JSONB effective schemas.
 - **Native UUIDv7 Primary Keys**: Uses .NET 10's native `Guid.CreateVersion7()` for time-sortable sequential identifiers, eliminating B-Tree index fragmentation and boosting PostgreSQL write throughput.
 - **Hierarchical Product Taxonomies (`ltree`)**: Dynamic category and product type hierarchies backed by PostgreSQL's native `ltree` extension with GiST indexing for fast subtree queries.
@@ -153,10 +197,10 @@ Incoming HTTP Request
 - **Transactional Outbox Pattern**: Domain events (`ProductCreatedDomainEvent`, `ProductArchivedDomainEvent`) are automatically serialized into the `outbox.messages` table within the same atomic database transaction via EF Core interceptors (`OutboxSaveChangesInterceptor`).
 - **Automated Auditing Interceptor**: EF Core `AuditingSaveChangesInterceptor` automatically stamps `CreatedAtUtc`, `CreatedBy`, `UpdatedAtUtc`, and `UpdatedBy` across entities and nested owned entities without polluting command handlers.
 - **Optimistic Concurrency via PostgreSQL `xmin`**: Uses PostgreSQL system column `xmin` (`IsRowVersion()`) to detect concurrent modifications and automatically return HTTP `409 Conflict` problem details.
-- **Sliding-Window Rate Limiting**: Built-in partition-based rate limiter partitioning by authenticated user ID / client ID or client IP, returning RFC 7807 `429 Too Many Requests` with `Retry-After` headers.
+- **Pre-Resolution Rate Limiting**: Built-in sliding-window rate limiter executing before tenant resolution to prevent tenant enumeration and denial of service.
 - **OpenTelemetry & Observability**: Complete distributed tracing, metrics, and structured logging integrated with OTLP exporters.
-- **Standardized RFC 7807 Error Responses**: Custom `GlobalExceptionHandler` produces structured JSON problem details with correlation trace IDs for validation errors (400), domain invariant violations (422), concurrency conflicts (409), not found (404), and unhandled server faults (500).
-- **Automated Verification**: **225 tests** across architectural integrity (`NetArchTest`), domain invariants (`xUnit v3`), API behavior, and real PostgreSQL integration tests (`Testcontainers.PostgreSql`).
+- **High-Performance Logging**: Zero-allocation compile-time `[LoggerMessage]` source-generated logging in exception handlers.
+- **Automated Verification**: **234+ tests** across architectural boundaries (`NetArchTest`), domain invariants (`xUnit v3`), API integration, and real PostgreSQL integration tests (`Testcontainers.PostgreSql`).
 
 ---
 
@@ -167,6 +211,8 @@ CommerceCore/
 ├── CommerceCore.slnx                                   # Modern solution manifest (.slnx)
 ├── docker-compose.yml                                  # Local development infrastructure (PostgreSQL 18.6 & pgAdmin 4)
 ├── Dockerfile                                          # Multi-stage production container build
+├── Directory.Build.props                               # WarningsAsErrors & AnalysisLevel latest-recommended
+├── .editorconfig                                       # Standardized code style & analyzer rules
 ├── dotnet-tools.json                                   # Local CLI tools (dotnet-ef)
 ├── global.json                                         # Microsoft Testing Platform configuration
 │
@@ -177,15 +223,13 @@ CommerceCore/
 │   │
 │   ├── Platform/
 │   │   ├── CommerceCore.Platform.Contracts/            # Multi-Tenancy abstractions (ITenantContext, TenantId, MarketId)
-│   │   ├── CommerceCore.Platform.ControlPlane/         # Tenant, Storefront, TenantMembership entities & store
+│   │   ├── CommerceCore.Platform.ControlPlane/         # Tenant, Storefront, Membership entities & store
 │   │   └── CommerceCore.Platform.Identity/             # TenantResolutionMiddleware, Identity & Scope extensions
 │   │
 │   ├── Modules/
 │   │   └── Catalog/
-│   │       ├── CommerceCore.Modules.Catalog.Contracts/ # Inter-module catalog contracts
 │   │       ├── CommerceCore.Modules.Catalog.Domain/    # Product, ProductVariant, ProductType, Attribute aggregates
-│   │       ├── CommerceCore.Modules.Catalog.Application/ # Catalog CQRS Commands, Queries, Handlers & Validators
-│   │       └── CommerceCore.Modules.Catalog.Infrastructure/ # Catalog-specific infrastructure implementations
+│   │       └── CommerceCore.Modules.Catalog.Application/ # Catalog CQRS Commands, Queries, Handlers & Validators
 │   │
 │   ├── Infrastructure/
 │   │   ├── CommerceCore.Infrastructure/                # System implementations (SystemClock)
@@ -194,11 +238,14 @@ CommerceCore/
 │   └── Presentation/
 │       └── CommerceCore.Api/                           # Minimal APIs, RateLimiting, Security, Observability, Program.cs
 │
-└── tests/
-    ├── CommerceCore.Domain.UnitTests/                  # 149 Tests: Domain entities, invariants, value objects
-    ├── CommerceCore.Persistence.IntegrationTests/      # 42 Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
-    ├── CommerceCore.Api.UnitTests/                     # 28 Tests: Endpoint parsers, auth regression, middleware
-    └── CommerceCore.ArchitectureTests/                 # 6 Tests: Architecture & Layer boundary rules (NetArchTest)
+├── tests/
+│   ├── CommerceCore.Domain.UnitTests/                  # 150 Tests: Domain entities, invariants, value objects
+│   ├── CommerceCore.Persistence.IntegrationTests/      # 44+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
+│   ├── CommerceCore.Api.UnitTests/                     # 30 Tests: Endpoint parsers, auth regression, middleware
+│   └── CommerceCore.ArchitectureTests/                 # 10 Tests: Architecture & Layer boundary rules (NetArchTest)
+│
+└── tools/
+    └── CommerceCore.Bootstrap/                         # CLI utility for tenant, storefront & admin provisioning
 ```
 
 ---
@@ -240,6 +287,7 @@ Inherits `BaseEntity<ProductVariantId>`:
 - **Identity**: `ProductVariantId` (UUIDv7).
 - **SKU**: `VariantSku` (unique within tenant).
 - **Pricing**: Base variant `Money` (positive amount, 3-letter currency).
+- **Currency Parity**: Variant price currency is strictly validated to match the product's base price currency.
 - **Variant Options**: `AttributeValueBag` storing variation attributes (e.g., `size`, `color`).
 - **Status**: `ProductVariantStatus` (`Draft = 1`, `Active = 2`, `Inactive = 3`).
 - **Default Flag**: `IsDefault` ensuring each product has exactly one primary variant.
@@ -247,7 +295,7 @@ Inherits `BaseEntity<ProductVariantId>`:
 #### Lifecycle Invariants:
 1. **Creation**: Products are initialized in `Draft` status and emit `ProductCreatedDomainEvent`.
 2. **Variants**: A product cannot be activated without an active default variant having a positive price.
-3. **Currency Invariant**: Currency must be consistent across product variants.
+3. **Currency Invariant**: Variant currency must strictly equal the product base price currency.
 4. **Soft Deletion**: Idempotent archiving stamps UTC timestamp and actor, emitting `ProductArchivedDomainEvent`. Modifying archived products is forbidden.
 5. **Restoration**: Restoring an archived product that was previously `Active` resets its status to `Inactive` to prevent accidental immediate exposure.
 
@@ -275,8 +323,9 @@ Inherits `AggregateRoot<ProductTypeId>`:
 ### 3. Platform Control Plane & Multi-Tenancy
 
 - **`Tenant`**: Represents the isolated organization (`Id`, `Name`, `Slug`, `Status`, `CreatedAtUtc`).
-- **`Storefront`**: E-commerce sales channel mapped to a tenant (`Id`, `TenantId`, `HostName`, `MarketCode`, `DefaultLocale`, `IsActive`).
+- **`Storefront`**: E-commerce sales channel mapped to a tenant (`Id`, `TenantId`, `HostName`, `MarketCode`, `DefaultLocale`, `IsActive`). Hostnames are enforced lowercase via database check constraint.
 - **`TenantMembership`**: Maps user subjects to tenants with roles (`TenantId`, `UserSubject`, `Role`, `Status`).
+- **Type-Safe Constants**: `TenantStatuses.Active`, `TenantMembershipStatuses.Active`, `TenantMembershipRoles.Admin`.
 
 ---
 
@@ -467,6 +516,14 @@ CREATE POLICY tenant_isolation_policy ON catalog.products
 
 ## Security, Resilience & Observability
 
+### Rate Limiting Before Tenant Resolution (DoS Mitigation)
+
+The rate limiter is mounted **before** tenant resolution middleware in `Program.cs`:
+- Unauthenticated or malicious actors sending high-volume traffic cannot trigger expensive storefront database lookups.
+- **Partitioning**: Grouped by authenticated User ID (`sub`), Client ID (`client_id`), or client IP address.
+- **Permit Limits**: 300 requests/minute for read operations (`GET`), 60 requests/minute for write operations (`POST`, `PUT`, `DELETE`).
+- **Response**: Returns HTTP `429 Too Many Requests` with RFC 7807 problem details and `Retry-After` header.
+
 ### Authentication & Scoped Authorization
 
 Endpoints enforce JWT Bearer authentication with scope-based authorization policies:
@@ -474,14 +531,7 @@ Endpoints enforce JWT Bearer authentication with scope-based authorization polic
 - `catalog.manage`: Write permissions for creating and modifying products, variants, prices, and specifications.
 - `catalog.schema.manage`: Administrative permissions to define product types, attributes, and options.
 
-### Partitioned Rate Limiting
-
-The API includes sliding-window rate limiting configured via ASP.NET Core:
-- **Partitioning**: Grouped by authenticated User ID (`sub`), Client ID (`client_id`), or remote IP address.
-- **Permit Limits**: 300 requests/minute for read operations (`GET`), 60 requests/minute for write operations (`POST`, `PUT`, `DELETE`).
-- **Response**: Returns HTTP `429 Too Many Requests` with RFC 7807 problem details and `Retry-After` header.
-
-### Security Headers & Hardening
+### Security Headers & Kestrel Hardening
 
 Configured via `SecurityHeadersMiddleware`:
 - `Content-Security-Policy: default-src 'self'`
@@ -489,13 +539,19 @@ Configured via `SecurityHeadersMiddleware`:
 - `X-Frame-Options: DENY`
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- Server Header stripped from Kestrel response (`AddServerHeader = false`).
+- Server header stripped from Kestrel response (`AddServerHeader = false`).
 
 ### OpenTelemetry & Health Probes
 
 - **Tracing & Metrics**: Integrated with ASP.NET Core, HttpClient, and Runtime meters exporting via OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT`).
 - **Liveness Probe**: `/health/live` returns HTTP 200 indicating the process is running.
-- **Readiness Probe**: `/health/ready` evaluates the PostgreSQL connection probe (`PostgreSqlHealthCheck`).
+- **Readiness Probe**: `/health/ready` evaluates the PostgreSQL database connection probe (`PostgreSqlHealthCheck`).
+
+### High-Performance Logging
+
+Global exception handling uses compile-time source-generated logging (`[LoggerMessage]`):
+- Avoids boxing and heap allocations during error formatting.
+- Automatically preserves `traceId` correlation tags across all logs.
 
 ---
 
@@ -542,7 +598,7 @@ Base route: `/api/product-types`
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health/live` | Liveness health probe (returns 200 OK) |
-| `GET` | `/health/ready` | Readiness probe (verifies PostgreSQL database connection) |
+| `GET` | `/health/ready` | Readiness probe (verifies PostgreSQL database connectivity) |
 
 ---
 
@@ -663,6 +719,32 @@ All application errors strictly adhere to the **RFC 7807 Problem Details** speci
 
 ---
 
+## CLI Tooling: CommerceCore.Bootstrap
+
+CommerceCore includes an administrative CLI tool (`tools/CommerceCore.Bootstrap`) to safely provision new tenants, storefronts, and admin memberships:
+
+```bash
+# Set environment variables for the bootstrap tool
+export COMMERCECORE_BOOTSTRAP_ConnectionStrings__CommerceCoreDatabase="Host=localhost;Port=5432;Database=CommerceCoreDb;Username=postgres;Password=Commerce123!"
+export COMMERCECORE_BOOTSTRAP_TENANT_SLUG="acme-corp"
+export COMMERCECORE_BOOTSTRAP_TENANT_NAME="Acme Corporation"
+export COMMERCECORE_BOOTSTRAP_HOST_NAME="acme.store.local"
+export COMMERCECORE_BOOTSTRAP_MARKET_CODE="US"
+export COMMERCECORE_BOOTSTRAP_DEFAULT_LOCALE="en-US"
+export COMMERCECORE_BOOTSTRAP_ADMIN_SUBJECT="auth0|64f1234567890abcdef"
+
+# Run bootstrap
+dotnet run --project tools/CommerceCore.Bootstrap
+```
+
+### Safety Invariants Enforced by Bootstrap CLI:
+1. **Pending Migrations Check**: Halts immediately if unapplied migrations exist.
+2. **Atomic Execution**: Wraps tenant, storefront, and membership creation in a single transaction.
+3. **Collision Prevention**: Prevents reusing existing slugs with differing tenant names or assigning an admin to multiple tenants.
+4. **Normalized Hostnames**: Validates and normalizes storefront hostnames without protocol or port.
+
+---
+
 ## Getting Started & Local Setup
 
 ### Prerequisites
@@ -675,22 +757,28 @@ git clone https://github.com/MahirSafar/CommerceCore.git
 cd CommerceCore
 ```
 
-### 2. Start PostgreSQL & pgAdmin
-Launch containerized PostgreSQL 18.6 and pgAdmin 4:
+### 2. Configure Environment & Start Services
+Copy `.env.example` to `.env` and start PostgreSQL 18.6 and pgAdmin 4:
 ```bash
+cp .env.example .env
 docker compose up -d
 ```
-- **PostgreSQL**: `localhost:5432` (User: `CommerceCore`, Password: `Commerce123!`, DB: `CommerceCoreDb`)
+- **PostgreSQL**: `localhost:5432` (User: `CommerceCore`, Database: `CommerceCoreDb`)
 - **pgAdmin 4**: `http://localhost:5050` (Email: `admin@commercecore.com`, Password: `Admin123!`)
 
-### 3. Apply EF Core Database Migrations
-Restore local tools and apply code-first migrations:
+### 3. Apply EF Core Migrations
+Restore tools and update the database:
 ```bash
 dotnet tool restore
 dotnet ef database update --project src/Infrastructure/CommerceCore.Persistence --startup-project src/Presentation/CommerceCore.Api
 ```
 
-### 4. Run the API
+### 4. Bootstrap Initial Tenant & Storefront
+```bash
+dotnet run --project tools/CommerceCore.Bootstrap
+```
+
+### 5. Run the API
 ```bash
 dotnet run --project src/Presentation/CommerceCore.Api
 ```
@@ -699,55 +787,81 @@ OpenAPI documentation is available at `/openapi/v1.json`.
 
 ---
 
+## CI/CD Automation & Quality Gates
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) enforces automated quality gates on every push and pull request:
+
+1. **Deterministic Build**: Compiles solution in `Release` configuration with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`.
+2. **C# Formatting Gate**: Asserts zero formatting divergence:
+   ```bash
+   dotnet format CommerceCore.slnx --verify-no-changes --no-restore --severity warn
+   ```
+3. **Pending Model Changes Check**: Verifies the EF Core model is 100% in sync with code migrations:
+   ```bash
+   dotnet ef migrations has-pending-model-changes --no-build
+   ```
+4. **Idempotent Migration Script Generation**: Asserts migration SQL generation succeeds without errors:
+   ```bash
+   dotnet ef migrations script --idempotent --no-build
+   ```
+5. **Container Image Build**: Validates multi-stage production `Dockerfile` builds cleanly.
+6. **Automated Test Suite**: Executes all unit, integration, and architecture tests in `Release` mode.
+
+---
+
 ## Testing Strategy & Quality Assurance
 
-The repository includes a comprehensive, multi-tiered testing suite with **225 passing automated tests**:
+The repository includes a comprehensive, multi-tiered testing suite with **234+ passing automated tests**:
 
 ```text
 tests/
-├── CommerceCore.Domain.UnitTests/             # 149 Tests: Domain entities, invariants, value objects
-├── CommerceCore.Persistence.IntegrationTests/ # 42 Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
-├── CommerceCore.Api.UnitTests/                # 28 Tests: Endpoint parsers, auth regression, middleware
-└── CommerceCore.ArchitectureTests/            # 6 Tests: Architecture & Layer boundary rules (NetArchTest)
+├── CommerceCore.Domain.UnitTests/             # 150 Tests: Domain entities, invariants, value objects
+├── CommerceCore.Persistence.IntegrationTests/ # 44+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
+├── CommerceCore.Api.UnitTests/                # 30 Tests: Endpoint parsers, auth regression, middleware
+└── CommerceCore.ArchitectureTests/            # 10 Tests: Architecture & Layer boundary rules (NetArchTest)
 ```
 
 ### Run Architecture Tests
+Verifies Clean Architecture rules, ensuring Domain and Application layers maintain zero forbidden dependencies:
 ```bash
 dotnet test tests/CommerceCore.ArchitectureTests/CommerceCore.ArchitectureTests.csproj
 ```
 
 ### Run Domain Unit Tests
+Tests domain aggregates, value objects (`Money`, `LocalizedText`, `LanguageCode`, `AttributeValueBag`), variant currency parity, and invariant validations:
 ```bash
 dotnet test tests/CommerceCore.Domain.UnitTests/CommerceCore.Domain.UnitTests.csproj
 ```
 
 ### Run API Unit Tests
+Verifies endpoint request/response parsers, rate limiting, and authorization policies:
 ```bash
 dotnet test tests/CommerceCore.Api.UnitTests/CommerceCore.Api.UnitTests.csproj
 ```
 
 ### Run Integration Tests (Requires Docker)
-Spawns isolated PostgreSQL containers via Testcontainers, applies migrations, and verifies RLS tenant isolation, outbox transactions, and concurrency tokens:
+Spawns isolated PostgreSQL containers via Testcontainers, applies migrations, and verifies RLS tenant isolation, outbox transactions, and least-privilege security permissions:
 ```bash
 dotnet test tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj
 ```
 
 ### Run All Tests
 ```bash
-dotnet test
+dotnet test CommerceCore.slnx
 ```
 
 ---
 
 ## Engineering Practices & Design Patterns
 
-- **Modular Monolith**: Clear module and package boundaries allowing independent module evolution and straightforward future microservice extraction.
+- **Modular Monolith**: Clear module boundaries allowing independent evolution and straightforward future microservice extraction.
 - **Clean Architecture & DDD**: Pure domain model, explicit Aggregate Roots, encapsulated business invariants, and immutable Value Objects.
 - **CQRS (Command Query Responsibility Segregation)**: Distinct write commands and read queries with optimized query pipelines.
 - **Compile-Time Source Generation**: Zero-reflection CQRS dispatching with `Mediator.SourceGenerator`.
-- **Pool Multi-Tenancy with RLS**: PostgreSQL Row-Level Security enforcing tenant boundary directly at the database engine.
+- **Pool Multi-Tenancy with RLS**: PostgreSQL Row-Level Security enforcing tenant boundaries directly at the database engine.
+- **Least-Privilege Security**: Hardened runtime app role preventing unauthorized administrative access to platform metadata.
 - **Transactional Outbox**: Guaranteed at-least-once domain event persistence within relational transactions.
-- **Hierarchical Schemas (`ltree`)**: Native PostgreSQL path indexing for high-speed taxonomy trees.
+- **Hierarchical Taxonomies (`ltree`)**: Native PostgreSQL path indexing for high-speed taxonomy trees.
 - **Optimistic Concurrency Control**: Automatic conflict detection and 409 handling via PostgreSQL `xmin`.
 - **Automated Auditing**: Created and Updated timestamps/actors automatically injected via EF Core Interceptors.
 - **UUIDv7 Primary Keys**: Time-ordered UUIDs for optimal database index locality and clustered index performance.
