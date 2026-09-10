@@ -170,6 +170,40 @@ public sealed partial class GlobalExceptionHandler(
         return WriteProblemAsync(httpContext, problem, cancellationToken);
     }
 
+    private static Task WriteReferencedResourceConflictProblemAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        ProblemDetails problem = new()
+        {
+            Type = "/problems/referenced-resource-conflict",
+            Title = "The operation conflicts with a referenced resource.",
+            Status = StatusCodes.Status409Conflict,
+            Instance = httpContext.Request.Path
+        };
+
+        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        return WriteProblemAsync(httpContext, problem, cancellationToken);
+    }
+
+    private static Task WriteDatabaseConstraintProblemAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        ProblemDetails problem = new()
+        {
+            Type = "/problems/database-constraint-violation",
+            Title = "The provided data violates a database constraint.",
+            Status = StatusCodes.Status422UnprocessableEntity,
+            Instance = httpContext.Request.Path
+        };
+
+        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+
+        return WriteProblemAsync(httpContext, problem, cancellationToken);
+    }
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -205,6 +239,32 @@ public sealed partial class GlobalExceptionHandler(
                 InnerException: PostgresException { SqlState: "23505" }
             }:
                 await WriteUniqueConstraintProblemAsync(
+                    httpContext,
+                    cancellationToken);
+
+                return true;
+
+            case DbUpdateException
+            {
+                InnerException: PostgresException
+                {
+                    SqlState: PostgresErrorCodes.ForeignKeyViolation
+                }
+            }:
+                await WriteReferencedResourceConflictProblemAsync(
+                    httpContext,
+                    cancellationToken);
+
+                return true;
+
+            case DbUpdateException
+            {
+                InnerException: PostgresException
+                {
+                    SqlState: PostgresErrorCodes.CheckViolation
+                }
+            }:
+                await WriteDatabaseConstraintProblemAsync(
                     httpContext,
                     cancellationToken);
 
