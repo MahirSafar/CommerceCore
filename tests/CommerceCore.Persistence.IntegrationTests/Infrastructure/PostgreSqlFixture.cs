@@ -95,6 +95,27 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task CreateStorefrontAsync(
+        TenantId tenantId,
+        string hostName,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        dbContext.Storefronts.Add(new Storefront
+        {
+            Id = StorefrontId.New().Value,
+            TenantId = tenantId,
+            HostName = hostName,
+            MarketCode = "AZ",
+            DefaultLocale = "az-AZ",
+            IsActive = true
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
