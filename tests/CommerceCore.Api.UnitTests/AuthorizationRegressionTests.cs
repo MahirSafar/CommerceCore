@@ -67,21 +67,17 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                         testTenantId,
                         "test-user",
                         NSubstitute.Arg.Any<CancellationToken>())
-                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.TenantMembership
-                    {
-                        TenantId = testTenantId,
-                        UserSubject = "test-user",
-                        Role = "Admin",
-                        Status = "Active"
-                    });
+                    .Returns(CommerceCore.Platform.ControlPlane.Entities.TenantMembership.Create(
+                        testTenantId,
+                        "test-user",
+                        CommerceCore.Platform.ControlPlane.Entities.TenantMembershipRoles.Admin));
                 mockTenantStore.GetStorefrontByHostAsync(NSubstitute.Arg.Any<string>(), NSubstitute.Arg.Any<CancellationToken>())
-                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.Storefront
-                    {
-                        Id = Guid.NewGuid(),
-                        TenantId = testTenantId,
-                        HostName = "localhost",
-                        IsActive = true
-                    });
+                    .Returns(CommerceCore.Platform.ControlPlane.Entities.Storefront.Create(
+                        CommerceCore.Platform.Contracts.StorefrontId.New(),
+                        testTenantId,
+                        "localhost",
+                        CommerceCore.Platform.Contracts.MarketId.From("AZ"),
+                        "az-AZ"));
                 services.AddScoped(_ => mockTenantStore);
             });
 

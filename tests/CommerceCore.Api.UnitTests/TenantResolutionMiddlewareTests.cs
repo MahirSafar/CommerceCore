@@ -29,15 +29,12 @@ public sealed class TenantResolutionMiddlewareTests
 
         var tenantId = Guid.NewGuid();
         var storefrontId = Guid.NewGuid();
-        var storefront = new Storefront
-        {
-            Id = storefrontId,
-            TenantId = TenantId.From(tenantId),
-            HostName = "store1.example.com",
-            MarketCode = "AZ",
-            DefaultLocale = "az-AZ",
-            IsActive = true
-        };
+        var storefront = Storefront.Create(
+            StorefrontId.From(storefrontId),
+            TenantId.From(tenantId),
+            "store1.example.com",
+            MarketId.From("AZ"),
+            "az-AZ");
 
         _tenantStore.GetStorefrontByHostAsync("store1.example.com", Arg.Any<CancellationToken>())
             .Returns(storefront);
@@ -46,13 +43,10 @@ public sealed class TenantResolutionMiddlewareTests
                 TenantId.From(tenantId),
                 userSub,
                 Arg.Any<CancellationToken>())
-            .Returns(new TenantMembership
-            {
-                TenantId = TenantId.From(tenantId),
-                UserSubject = userSub,
-                Role = "Admin",
-                Status = "Active"
-            });
+            .Returns(TenantMembership.Create(
+                TenantId.From(tenantId),
+                userSub,
+                TenantMembershipRoles.Admin));
 
         var nextCalled = false;
         var middleware = new TenantResolutionMiddleware(ctx =>
@@ -114,13 +108,12 @@ public sealed class TenantResolutionMiddlewareTests
 
         TenantId tenantId = TenantId.New();
 
-        var storefront = new Storefront
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            HostName = "admin.example.com",
-            IsActive = true
-        };
+        var storefront = Storefront.Create(
+            StorefrontId.New(),
+            tenantId,
+            "admin.example.com",
+            MarketId.From("AZ"),
+            "az-AZ");
 
         _tenantStore.GetStorefrontByHostAsync(
                 "admin.example.com",
@@ -131,13 +124,10 @@ public sealed class TenantResolutionMiddlewareTests
                 tenantId,
                 userSub,
                 Arg.Any<CancellationToken>())
-            .Returns(new TenantMembership
-            {
-                TenantId = tenantId,
-                UserSubject = userSub,
-                Role = "Admin",
-                Status = "Active"
-            });
+            .Returns(TenantMembership.Create(
+                tenantId,
+                userSub,
+                TenantMembershipRoles.Admin));
 
         var nextCalled = false;
         var middleware = new TenantResolutionMiddleware(_ =>
@@ -170,13 +160,12 @@ public sealed class TenantResolutionMiddlewareTests
 
         TenantId tenantId = TenantId.New();
 
-        var storefront = new Storefront
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            HostName = "admin.example.com",
-            IsActive = true
-        };
+        var storefront = Storefront.Create(
+            StorefrontId.New(),
+            tenantId,
+            "admin.example.com",
+            MarketId.From("AZ"),
+            "az-AZ");
 
         _tenantStore.GetStorefrontByHostAsync(
                 "admin.example.com",
@@ -220,13 +209,12 @@ public sealed class TenantResolutionMiddlewareTests
         _tenantStore.GetStorefrontByHostAsync(
                 "store1.example.com",
                 Arg.Any<CancellationToken>())
-            .Returns(new Storefront
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                HostName = "store1.example.com",
-                IsActive = true
-            });
+            .Returns(Storefront.Create(
+                StorefrontId.New(),
+                tenantId,
+                "store1.example.com",
+                MarketId.From("AZ"),
+                "az-AZ"));
 
         _tenantStore.GetActiveMembershipAsync(
                 tenantId,

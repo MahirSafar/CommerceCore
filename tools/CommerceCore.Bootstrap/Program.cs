@@ -47,14 +47,10 @@ try
 
     if (tenant is null)
     {
-        tenant = new Tenant
-        {
-            Id = TenantId.New(),
-            Slug = tenantSlug,
-            Name = tenantName,
-            Status = TenantStatuses.Active,
-            CreatedAtUtc = DateTime.UtcNow
-        };
+        tenant = Tenant.Create(
+            TenantId.New(),
+            tenantSlug,
+            tenantName);
 
         dbContext.Tenants.Add(tenant);
     }
@@ -69,15 +65,12 @@ try
 
     if (storefront is null)
     {
-        storefront = new Storefront
-        {
-            Id = StorefrontId.New().Value,
-            TenantId = tenant.Id,
-            HostName = hostName,
-            MarketCode = marketCode,
-            DefaultLocale = defaultLocale,
-            IsActive = true
-        };
+        storefront = Storefront.Create(
+            StorefrontId.New(),
+            tenant.Id,
+            hostName,
+            MarketId.From(marketCode),
+            defaultLocale);
 
         dbContext.Storefronts.Add(storefront);
     }
@@ -108,13 +101,10 @@ try
 
     if (existingMembership is null)
     {
-        dbContext.TenantMemberships.Add(new TenantMembership
-        {
-            TenantId = tenant.Id,
-            UserSubject = adminSubject,
-            Role = TenantMembershipRoles.Admin,
-            Status = TenantMembershipStatuses.Active
-        });
+        dbContext.TenantMemberships.Add(TenantMembership.Create(
+            tenant.Id,
+            adminSubject,
+            TenantMembershipRoles.Admin));
     }
     else if (existingMembership.Role != TenantMembershipRoles.Admin ||
              existingMembership.Status != TenantMembershipStatuses.Active)
