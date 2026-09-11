@@ -1,4 +1,4 @@
-﻿using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
@@ -22,15 +22,6 @@ public sealed class DefineAttributeCommandHandler(
     {
         ProductTypeId productTypeId = ProductTypeId.From(command.ProductTypeId);
 
-        ProductType productType = await _dbContext.ProductTypes
-            .Include(item => item.AttributeDefinitions)
-            .SingleOrDefaultAsync(
-                item => item.Id == productTypeId,
-                cancellationToken)
-            ?? throw new ProductTypeDomainException(
-                "product_type.not_found",
-                $"Product type '{productTypeId}' was not found.");
-
         AttributeKey key = AttributeKey.Create(command.Key);
 
         MeasurementUnitFamily? measurementUnitFamily =
@@ -44,6 +35,15 @@ public sealed class DefineAttributeCommandHandler(
             productTypeId,
             async token =>
             {
+                ProductType productType = await _dbContext.ProductTypes
+                    .Include(item => item.AttributeDefinitions)
+                    .SingleOrDefaultAsync(
+                        item => item.Id == productTypeId,
+                        token)
+                    ?? throw new ProductTypeDomainException(
+                        "product_type.not_found",
+                        $"Product type '{productTypeId}' was not found.");
+
                 await _attributeDefinitionRegistry.EnsureKeyIsUniqueInHierarchyAsync(
                     productTypeId,
                     key,
