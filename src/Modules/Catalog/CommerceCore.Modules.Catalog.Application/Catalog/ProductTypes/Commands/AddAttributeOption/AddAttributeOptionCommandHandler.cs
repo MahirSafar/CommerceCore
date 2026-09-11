@@ -1,4 +1,4 @@
-using CommerceCore.Domain.Catalog.ProductTypes;
+﻿using CommerceCore.Domain.Catalog.ProductTypes;
 using CommerceCore.Domain.Catalog.ProductTypes.Exceptions;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
@@ -22,6 +22,16 @@ public sealed class AddAttributeOptionCommandHandler(
     {
         ProductTypeId productTypeId = ProductTypeId.From(command.ProductTypeId);
 
+        ProductType productType = await _dbContext.ProductTypes
+            .Include(item => item.AttributeDefinitions)
+            .ThenInclude(item => item.Options)
+            .SingleOrDefaultAsync(
+                item => item.Id == productTypeId,
+                cancellationToken)
+            ?? throw new ProductTypeDomainException(
+                "product_type.not_found",
+                $"Product type '{productTypeId}' was not found.");
+
         AttributeDefinitionId attributeDefinitionId =
             AttributeDefinitionId.From(command.AttributeDefinitionId);
 
@@ -34,16 +44,6 @@ public sealed class AddAttributeOptionCommandHandler(
             productTypeId,
             async token =>
             {
-                ProductType productType = await _dbContext.ProductTypes
-                    .Include(item => item.AttributeDefinitions)
-                    .ThenInclude(item => item.Options)
-                    .SingleOrDefaultAsync(
-                        item => item.Id == productTypeId,
-                        token)
-                    ?? throw new ProductTypeDomainException(
-                        "product_type.not_found",
-                        $"Product type '{productTypeId}' was not found.");
-
                 attributeOption = productType.AddAttributeOption(
                     attributeDefinitionId,
                     optionCode,
