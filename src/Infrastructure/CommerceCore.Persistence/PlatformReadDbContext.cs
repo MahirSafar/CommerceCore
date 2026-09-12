@@ -20,4 +20,22 @@ public sealed class PlatformReadDbContext(
 
         base.OnModelCreating(modelBuilder);
     }
+
+    private static NotSupportedException CreateReadOnlyException() =>
+        new("PlatformReadDbContext is read-only.");
+
+    public override int SaveChanges() =>
+        throw CreateReadOnlyException();
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess) =>
+        throw CreateReadOnlyException();
+
+    public override Task<int> SaveChangesAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<int>(CreateReadOnlyException());
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default) =>
+        Task.FromException<int>(CreateReadOnlyException());
 }
