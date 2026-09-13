@@ -9,7 +9,12 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {
     public void Configure(EntityTypeBuilder<Tenant> builder)
     {
-        builder.ToTable("tenants", schema: "platform");
+        builder.ToTable(
+            "tenants",
+            schema: "platform",
+            tableBuilder => tableBuilder.HasCheckConstraint(
+                "ck_platform_tenants_status",
+                "status IN ('Active', 'Inactive')"));
 
         builder.HasKey(tenant => tenant.Id);
 
