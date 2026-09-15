@@ -154,4 +154,28 @@ public sealed class GlobalExceptionHandlerTests
             "/problems/database-constraint-violation",
             document.RootElement.GetProperty("type").GetString());
     }
-}
+
+    [Fact]
+    public async Task TryHandleAsync_WithCancelledRequest_DoesNotWriteProblemResponse()
+    {
+        var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        DefaultHttpContext context = new()
+        {
+            RequestAborted = cancellationSource.Token
+        };
+        context.Response.Body = new MemoryStream();
+
+        GlobalExceptionHandler handler = new(
+            NullLogger<GlobalExceptionHandler>.Instance);
+
+        bool handled = await handler.TryHandleAsync(
+            context,
+            new OperationCanceledException(),
+            CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(0, context.Response.Body.Length);
+    }
+}

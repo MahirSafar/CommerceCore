@@ -211,6 +211,10 @@ public sealed partial class GlobalExceptionHandler(
     {
         switch (exception)
         {
+            case OperationCanceledException
+                when httpContext.RequestAborted.IsCancellationRequested:
+                return true;
+
             case BadHttpRequestException:
                 await WriteInvalidRequestProblemAsync(
                     httpContext,
