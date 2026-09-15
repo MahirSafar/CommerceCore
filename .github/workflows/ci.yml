@@ -43,6 +43,7 @@ jobs:
           COMMERCECORE_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
         run: >
           dotnet ef migrations has-pending-model-changes
+          --context CommerceCoreDbContext
           --project src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj
           --startup-project src/Presentation/CommerceCore.Api/CommerceCore.Api.csproj
           --configuration Release
@@ -53,6 +54,7 @@ jobs:
           COMMERCECORE_MIGRATIONS_CONNECTION_STRING: Host=localhost;Port=5432;Database=commercecore_ci;Username=postgres;Password=postgres
         run: |
           dotnet ef migrations script \
+            --context CommerceCoreDbContext \
             --idempotent \
             --configuration Release \
             --no-build \

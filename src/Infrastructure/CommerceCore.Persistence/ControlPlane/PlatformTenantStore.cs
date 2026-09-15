@@ -7,9 +7,9 @@ namespace CommerceCore.Persistence.ControlPlane;
 
 public sealed class PlatformTenantStore : IPlatformTenantStore
 {
-    private readonly CommerceCoreDbContext _dbContext;
+    private readonly PlatformReadDbContext _dbContext;
 
-    public PlatformTenantStore(CommerceCoreDbContext dbContext)
+    public PlatformTenantStore(PlatformReadDbContext dbContext)
     {
         _dbContext = dbContext;
     }

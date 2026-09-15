@@ -161,6 +161,23 @@ public sealed class ProductVariantTests
         Assert.Equal("product.archived", exception.Code);
     }
 
+    [Fact]
+    public void AddVariant_WithMismatchedCurrency_ThrowsDomainException()
+    {
+        Product product = CreateProduct();
+
+        ProductDomainException exception = Assert.Throws<
+            ProductDomainException>(() => product.AddVariant(
+                VariantSku.Create("laptop-black-16"),
+                Money.Create(1200m, "EUR"),
+                Options("space-black"),
+                isDefault: true));
+
+        Assert.Equal(
+            "product.variant_currency_must_match_product",
+            exception.Code);
+    }
+
     private static Product CreateProduct()
     {
         LanguageCode language = LanguageCode.Create("en");

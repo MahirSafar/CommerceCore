@@ -61,8 +61,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
-app.UsePlatformTenantResolution();
 app.UseRateLimiter();
+app.UsePlatformTenantResolution();
 app.UseAuthorization();
 
 app.MapHealthCheckEndpoints();

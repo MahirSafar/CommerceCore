@@ -9,7 +9,12 @@ public sealed class TenantMembershipConfiguration : IEntityTypeConfiguration<Ten
 {
     public void Configure(EntityTypeBuilder<TenantMembership> builder)
     {
-        builder.ToTable("tenant_memberships", schema: "platform");
+        builder.ToTable(
+            "tenant_memberships",
+            schema: "platform",
+            tableBuilder => tableBuilder.HasCheckConstraint(
+                "ck_platform_tenant_memberships_status",
+                "status IN ('Active', 'Inactive')"));
 
         builder.HasKey(membership => new { membership.TenantId, membership.UserSubject });
 

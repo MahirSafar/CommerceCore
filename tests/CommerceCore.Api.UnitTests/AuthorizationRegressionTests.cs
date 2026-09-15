@@ -4,9 +4,12 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using NSubstitute;
+using CommerceCore.Api.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -67,21 +70,17 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
                         testTenantId,
                         "test-user",
                         NSubstitute.Arg.Any<CancellationToken>())
-                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.TenantMembership
-                    {
-                        TenantId = testTenantId,
-                        UserSubject = "test-user",
-                        Role = "Admin",
-                        Status = "Active"
-                    });
+                    .Returns(CommerceCore.Platform.ControlPlane.Entities.TenantMembership.Create(
+                        testTenantId,
+                        "test-user",
+                        CommerceCore.Platform.ControlPlane.Entities.TenantMembershipRoles.Admin));
                 mockTenantStore.GetStorefrontByHostAsync(NSubstitute.Arg.Any<string>(), NSubstitute.Arg.Any<CancellationToken>())
-                    .Returns(new CommerceCore.Platform.ControlPlane.Entities.Storefront
-                    {
-                        Id = Guid.NewGuid(),
-                        TenantId = testTenantId,
-                        HostName = "localhost",
-                        IsActive = true
-                    });
+                    .Returns(CommerceCore.Platform.ControlPlane.Entities.Storefront.Create(
+                        CommerceCore.Platform.Contracts.StorefrontId.New(),
+                        testTenantId,
+                        "localhost",
+                        CommerceCore.Platform.Contracts.MarketId.From("AZ"),
+                        "az-AZ"));
                 services.AddScoped(_ => mockTenantStore);
             });
 
@@ -243,6 +242,51 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
         var response = await client.GetAsync(endpoint, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public void CatalogEndpoints_RequireExpectedAuthorizationPolicies()
+    {
+        RouteEndpoint[] endpoints = _factory.Services
+            .GetServices<EndpointDataSource>()
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Where(endpoint =>
+                endpoint.RoutePattern.RawText?.StartsWith("/api/", StringComparison.Ordinal) == true)
+            .ToArray();
+
+        Assert.NotEmpty(endpoints);
+
+        foreach (RouteEndpoint endpoint in endpoints)
+        {
+            string[] policies = endpoint.Metadata
+                .GetOrderedMetadata<IAuthorizeData>()
+                .Select(data => data.Policy)
+                .OfType<string>()
+                .ToArray();
+
+            Assert.Contains(AuthorizationPolicies.CatalogRead, policies);
+
+            HttpMethodMetadata? methods =
+                endpoint.Metadata.GetMetadata<HttpMethodMetadata>();
+
+            bool isMutation = methods?.HttpMethods.Any(
+                method => method is not "GET" and not "HEAD" and not "OPTIONS") == true;
+
+            if (!isMutation)
+            {
+                continue;
+            }
+
+            string expectedWritePolicy =
+                endpoint.RoutePattern.RawText!.StartsWith(
+                    "/api/product-types",
+                    StringComparison.Ordinal)
+                    ? AuthorizationPolicies.CatalogSchemaManage
+                    : AuthorizationPolicies.CatalogManage;
+
+            Assert.Contains(expectedWritePolicy, policies);
+        }
     }
 
     private class DummyHealthCheck : IHealthCheck
