@@ -32,6 +32,10 @@ public sealed class OutboxMessage
     public DateTimeOffset? ProcessedOnUtc { get; private set; }
     public int AttemptCount { get; private set; }
     public string? LastError { get; private set; }
+    public Guid? LeaseId { get; private set; }
+    public DateTimeOffset? LeaseExpiresOnUtc { get; private set; }
+    public DateTimeOffset? NextAttemptOnUtc { get; private set; }
+    public DateTimeOffset? DeadLetteredOnUtc { get; private set; }
 
     public static OutboxMessage Create(
         IDomainEvent domainEvent,
