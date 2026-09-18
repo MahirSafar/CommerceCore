@@ -3,6 +3,7 @@ using System;
 using CommerceCore.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CommerceCore.Persistence.Migrations
 {
     [DbContext(typeof(CommerceCoreDbContext))]
-    partial class CommerceCoreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913062034_EnforcePlatformLifecycleValues")]
+    partial class EnforcePlatformLifecycleValues
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -447,25 +450,9 @@ namespace CommerceCore.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("content");
 
-                    b.Property<DateTimeOffset?>("DeadLetteredOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dead_lettered_on_utc");
-
                     b.Property<string>("LastError")
                         .HasColumnType("text")
                         .HasColumnName("last_error");
-
-                    b.Property<DateTimeOffset?>("LeaseExpiresOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lease_expires_on_utc");
-
-                    b.Property<Guid?>("LeaseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("lease_id");
-
-                    b.Property<DateTimeOffset?>("NextAttemptOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_attempt_on_utc");
 
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("timestamp with time zone")
@@ -487,18 +474,11 @@ namespace CommerceCore.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "NextAttemptOnUtc", "OccurredOnUtc", "Id")
-                        .HasDatabaseName("ix_outbox_messages_tenant_dispatch")
-                        .HasFilter("\"processed_on_utc\" IS NULL AND \"dead_lettered_on_utc\" IS NULL");
+                    b.HasIndex("TenantId", "OccurredOnUtc")
+                        .HasDatabaseName("ix_outbox_messages_tenant_pending_occurred_on_utc")
+                        .HasFilter("\"processed_on_utc\" IS NULL");
 
-                    b.ToTable("messages", "outbox", t =>
-                        {
-                            t.HasCheckConstraint("ck_outbox_messages_attempt_count", "attempt_count >= 0");
-
-                            t.HasCheckConstraint("ck_outbox_messages_lease_pair", "(lease_id IS NULL) = (lease_expires_on_utc IS NULL)");
-
-                            t.HasCheckConstraint("ck_outbox_messages_terminal_state", "NOT (\r\n    processed_on_utc IS NOT NULL\r\n    AND dead_lettered_on_utc IS NOT NULL\r\n)\r\nAND (\r\n    (processed_on_utc IS NULL AND dead_lettered_on_utc IS NULL)\r\n    OR (lease_id IS NULL AND next_attempt_on_utc IS NULL)\r\n)");
-                        });
+                    b.ToTable("messages", "outbox");
                 });
 
             modelBuilder.Entity("CommerceCore.Persistence.ProductTypes.ProductTypeEffectiveSchema", b =>

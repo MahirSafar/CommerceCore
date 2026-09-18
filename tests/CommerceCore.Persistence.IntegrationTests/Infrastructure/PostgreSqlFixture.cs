@@ -44,13 +44,10 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await using var dbContext =
             new CommerceCoreDbContext(_adminDbContextOptions);
 
-        dbContext.Tenants.Add(new Tenant
-        {
-            Id = tenantId,
-            Slug = $"integration-{tenantId.Value:N}",
-            Name = "Integration Test Tenant",
-            Status = TenantStatuses.Active
-        });
+        dbContext.Tenants.Add(Tenant.Create(
+            tenantId,
+            $"integration-{tenantId.Value:N}",
+            "Integration Test Tenant"));
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -67,13 +64,25 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await using var dbContext =
             new CommerceCoreDbContext(_adminDbContextOptions);
 
-        dbContext.TenantMemberships.Add(new TenantMembership
+        var membership = TenantMembership.Create(
+            tenantId,
+            userSubject,
+            role);
+
+        if (status == TenantMembershipStatuses.Active)
         {
-            TenantId = tenantId,
-            UserSubject = userSubject,
-            Role = role,
-            Status = status
-        });
+            membership.Activate();
+        }
+        else if (status == TenantMembershipStatuses.Inactive)
+        {
+            membership.Deactivate();
+        }
+        else
+        {
+            throw new ArgumentOutOfRangeException(nameof(status));
+        }
+
+        dbContext.TenantMemberships.Add(membership);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -90,7 +99,30 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             t => t.Id == tenantId,
             cancellationToken);
 
-        tenant.Status = status;
+        if (status == TenantStatuses.Active)
+            tenant.Activate();
+        else if (status == TenantStatuses.Inactive)
+            tenant.Deactivate();
+        else
+            throw new ArgumentOutOfRangeException(nameof(status));
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task CreateStorefrontAsync(
+        TenantId tenantId,
+        string hostName,
+        CancellationToken cancellationToken = default)
+    {
+        await using var dbContext =
+            new CommerceCoreDbContext(_adminDbContextOptions);
+
+        dbContext.Storefronts.Add(Storefront.Create(
+            StorefrontId.New(),
+            tenantId,
+            hostName,
+            MarketId.From("AZ"),
+            "az-AZ"));
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -112,20 +144,14 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             await migrationDb.Database.MigrateAsync();
 
             migrationDb.Tenants.AddRange(
-                new Tenant
-                {
-                    Id = PrimaryTenantId,
-                    Slug = "integration-primary",
-                    Name = "Integration Primary Tenant",
-                    Status = "Active"
-                },
-                new Tenant
-                {
-                    Id = SecondaryTenantId,
-                    Slug = "integration-secondary",
-                    Name = "Integration Secondary Tenant",
-                    Status = "Active"
-                });
+                Tenant.Create(
+                    PrimaryTenantId,
+                    "integration-primary",
+                    "Integration Primary Tenant"),
+                Tenant.Create(
+                    SecondaryTenantId,
+                    "integration-secondary",
+                    "Integration Secondary Tenant"));
 
             await migrationDb.SaveChangesAsync();
         }

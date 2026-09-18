@@ -284,6 +284,84 @@ public sealed class TenantRlsIntegrationTests
     }
 
     [Fact]
+    public async Task Rls_TenantB_Cannot_Read_TenantA_Outbox_Message()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        // 1. Tenant A context-də product type + product yarat, SaveChangesAsync ilə outbox message-in Id-sini al
+        TenantId tenantA = _fixture.PrimaryTenantId;
+        TenantId tenantB = _fixture.SecondaryTenantId;
+
+        var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
+        tenantContext.SetTenant(tenantA);
+
+        Guid outboxMessageId;
+        await using (var scopeA = _fixture.Services.CreateAsyncScope())
+        {
+            var dbA = scopeA.ServiceProvider.GetRequiredService<CommerceCoreDbContext>();
+
+            var productType = ProductType.CreateRoot(
+                tenantA,
+                ProductTypeCode.Create($"outbox_rls_{Guid.NewGuid():N}"[..24]),
+                isAssignable: true);
+            dbA.ProductTypes.Add(productType);
+            await dbA.SaveChangesAsync(cancellationToken);
+
+            var product = Product.Create(
+                tenantA,
+                CreateName("Outbox Product A"),
+                CreatePrice(500),
+                productType.Id,
+                DateTimeOffset.UtcNow);
+            product.AddVariant(
+                VariantSku.Create($"SKU-OUTBOX-A-{Guid.NewGuid():N}"[..20]),
+                CreatePrice(500),
+                CommerceCore.Domain.Catalog.Attributes.ValueObjects.AttributeValueBag.Empty,
+                isDefault: true);
+            dbA.Products.Add(product);
+
+            outboxMessageId = Assert.Single(product.DomainEvents).EventId;
+
+            await dbA.SaveChangesAsync(cancellationToken);
+
+            var outboxMessage = await dbA.OutboxMessages.SingleAsync(
+                m => m.Id == outboxMessageId,
+                cancellationToken);
+
+            Assert.Equal(tenantA, outboxMessage.TenantId);
+        }
+
+        // 2. Tenant B context-ə keç, həmin Id ilə OutboxMessages.SingleOrDefaultAsync(...) çağır
+        tenantContext.SetTenant(tenantB);
+
+        await using (var scopeB = _fixture.Services.CreateAsyncScope())
+        {
+            var dbB = scopeB.ServiceProvider.GetRequiredService<CommerceCoreDbContext>();
+
+            var messageUnderTenantB = await dbB.OutboxMessages
+                .SingleOrDefaultAsync(
+                    m => m.Id == outboxMessageId,
+                    cancellationToken);
+
+            // 3. Assert.Null(...) et
+            Assert.Null(messageUnderTenantB);
+        }
+
+        // Context-i təmizlə, OutboxMessages.ToListAsync(...) nəticəsinin boş olduğunu da yoxla
+        tenantContext.Clear();
+
+        await using (var scopeNoCtx = _fixture.Services.CreateAsyncScope())
+        {
+            var dbNoCtx = scopeNoCtx.ServiceProvider.GetRequiredService<CommerceCoreDbContext>();
+
+            var messages = await dbNoCtx.OutboxMessages.ToListAsync(cancellationToken);
+
+            Assert.Empty(messages);
+        }
+    }
+
+    [Fact]
     public async Task Rls_TenantA_Cannot_Link_ProductType_To_TenantB_Parent()
     {
         CancellationToken cancellationToken =

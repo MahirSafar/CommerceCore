@@ -1,6 +1,7 @@
 using CommerceCore.Persistence.ControlPlane;
 using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Platform.Contracts;
+using CommerceCore.Platform.ControlPlane;
 using CommerceCore.Platform.ControlPlane.Entities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,8 +34,7 @@ public sealed class PlatformTenantStoreIntegrationTests
             cancellationToken);
 
         await using var scope = _fixture.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<CommerceCoreDbContext>();
-        var store = new PlatformTenantStore(db);
+        var store = scope.ServiceProvider.GetRequiredService<IPlatformTenantStore>();
 
         var activeMembership = await store.GetActiveMembershipAsync(
             tenantId,

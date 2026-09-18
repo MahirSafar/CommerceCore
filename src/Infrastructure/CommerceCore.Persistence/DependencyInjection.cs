@@ -24,6 +24,17 @@ public static class DependencyInjection
         services.AddScoped<IAttributeDefinitionRegistry, AttributeDefinitionRegistry>();
         services.AddScoped<IPlatformTenantStore, PlatformTenantStore>();
 
+        services.AddDbContext<PlatformReadDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null);
+            });
+        });
+
         services.AddDbContext<CommerceCoreDbContext>(
             (serviceProvider, options) =>
             {
