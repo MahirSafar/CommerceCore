@@ -28,6 +28,7 @@
     <Project Path="tests/CommerceCore.Api.UnitTests/CommerceCore.Api.UnitTests.csproj" />
     <Project Path="tests/CommerceCore.ArchitectureTests/CommerceCore.ArchitectureTests.csproj" />
     <Project Path="tests/CommerceCore.Domain.UnitTests/CommerceCore.Domain.UnitTests.csproj" />
+    <Project Path="tests/CommerceCore.Outbox.Worker.IntegrationTests/CommerceCore.Outbox.Worker.IntegrationTests.csproj" />
     <Project Path="tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tools/">
