@@ -47,7 +47,7 @@ public static class WorkerServiceRegistration
                 });
         }
 
-        builder.Services.AddHostedService<RabbitMqTopologyInitializer>();
+        builder.Services.AddHostedService<RabbitMqTopologyVerifier>();
         builder.Services.AddHostedService<OutboxWorker>();
     }
 }

@@ -1,4 +1,6 @@
 .git/
+.codex/
+AGENTS.md
 .vs/
 .idea/
 tests/

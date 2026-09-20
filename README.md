@@ -264,7 +264,7 @@ CommerceCore implements a production-grade, resilient **Transactional Outbox Wor
    - Poison messages exceeding `MaximumAttempts = 5` are automatically moved to terminal dead-letter state (`dead_lettered_on_utc = statement_timestamp()`).
 4. **Resilient RabbitMQ Publisher (RabbitMQ.Client 7.x)**:
    - Built on modern asynchronous channel APIs with **Publisher Confirmations** (`CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true)`).
-   - Publishes to durable Topic Exchanges declared by `RabbitMqTopologyInitializer`.
+   - Publishes to durable Topic Exchanges verified passively by `RabbitMqTopologyVerifier`.
    - Strict 10-second confirmation timeouts with Semaphore-protected single-channel concurrency.
 5. **Versioned Integration Event Contracts**:
    - `OutboxEventMapper` transforms internal domain events into public integration event contracts:

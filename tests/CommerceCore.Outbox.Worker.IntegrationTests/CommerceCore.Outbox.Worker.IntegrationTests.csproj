@@ -22,6 +22,9 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="../../docker/postgres/provision-outbox-role.sql"
+          Link="provision-outbox-role.sql"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

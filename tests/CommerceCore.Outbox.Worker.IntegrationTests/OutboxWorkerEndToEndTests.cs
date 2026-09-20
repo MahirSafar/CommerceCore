@@ -288,24 +288,46 @@ public sealed class OutboxWorkerEndToEndTests(RabbitMqFixture rabbitMq)
         string adminConnection,
         CancellationToken token)
     {
+        string provisioningSql = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "provision-outbox-role.sql"),
+            token);
+
+        await adminDb.Database.ExecuteSqlRawAsync(provisioningSql, token);
+
         await adminDb.Database.ExecuteSqlRawAsync(
             """
-            CREATE ROLE outbox_worker
-                LOGIN PASSWORD 'DisposableWorkerPassword!'
-                NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
-
-            GRANT CONNECT ON DATABASE outbox_e2e TO outbox_worker;
-            GRANT USAGE ON SCHEMA platform, outbox TO outbox_worker;
-            GRANT SELECT ON platform.tenants TO outbox_worker;
-            GRANT SELECT, UPDATE ON outbox.messages TO outbox_worker;
+            ALTER ROLE commercecore_outbox PASSWORD 'DisposableWorkerPassword!';
             """,
             token);
 
-        return new NpgsqlConnectionStringBuilder(adminConnection)
+        // Provisioning is repeatable and must preserve existing credentials.
+        await adminDb.Database.ExecuteSqlRawAsync(provisioningSql, token);
+
+        string runtimeConnection = new NpgsqlConnectionStringBuilder(adminConnection)
         {
-            Username = "outbox_worker",
+            Username = "commercecore_outbox",
             Password = "DisposableWorkerPassword!"
         }.ConnectionString;
+
+        await using var connection = new NpgsqlConnection(runtimeConnection);
+        await connection.OpenAsync(token);
+        await using var privileges = connection.CreateCommand();
+        privileges.CommandText = """
+            SELECT current_user = 'commercecore_outbox'
+                AND NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit
+                         OR rolreplication OR rolbypassrls)
+                AND has_table_privilege(current_user, 'platform.tenants', 'SELECT')
+                AND NOT has_table_privilege(current_user, 'platform.tenants', 'INSERT, UPDATE, DELETE')
+                AND NOT has_table_privilege(current_user, 'platform.tenant_memberships', 'SELECT')
+                AND has_table_privilege(current_user, 'outbox.messages', 'SELECT')
+                AND has_table_privilege(current_user, 'outbox.messages', 'UPDATE')
+                AND NOT has_table_privilege(current_user, 'outbox.messages', 'INSERT, DELETE, TRUNCATE')
+                AND NOT has_schema_privilege(current_user, 'catalog', 'USAGE')
+            FROM pg_roles WHERE rolname = current_user;
+            """;
+        Assert.Equal(true, await privileges.ExecuteScalarAsync(token));
+
+        return runtimeConnection;
     }
 
     private static async Task WaitForCompletionAsync(
