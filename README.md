@@ -4,15 +4,16 @@
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com/)
 [![C# 13/14](https://img.shields.io/badge/C%23-13%2F14-239120?style=flat&logo=csharp)](https://docs.microsoft.com/dotnet/csharp/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.6-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4.3-FF6600?style=flat&logo=rabbitmq)](https://www.rabbitmq.com/)
 [![EF Core](https://img.shields.io/badge/EF%20Core-10.0-512BD4?style=flat&logo=dotnet)](https://docs.microsoft.com/ef/core/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith%20%7C%20Clean%20%7C%20DDD%20%7C%20CQRS-blueviolet?style=flat)]()
 [![Multi-Tenancy](https://img.shields.io/badge/Multi--Tenancy-Pool%20%2B%20PostgreSQL%20RLS-orange?style=flat)]()
 [![Security](https://img.shields.io/badge/Security-Least--Privilege%20App%20Role%20%7C%20RLS%20%7C%20JWT-red?style=flat)]()
-[![Tests](https://img.shields.io/badge/Tests-234%2B%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
+[![Tests](https://img.shields.io/badge/Tests-250%2B%20Passed%20%7C%20xUnit%20v3%20%7C%20Testcontainers-brightgreen?style=flat)]()
 
 **CommerceCore** is an enterprise-grade, high-performance modular e-commerce backend platform built with **.NET 10**, engineered around the principles of **Modular Monolith**, **Clean Architecture**, **Domain-Driven Design (DDD)**, and **CQRS (Command Query Responsibility Segregation)**.
 
-Engineered for extreme reliability, throughput, and multi-tenant isolation, the system provides native database-level **PostgreSQL Row-Level Security (RLS)**, least-privilege runtime database roles, compile-time source-generated mediation, a dynamic attribute & schema compilation engine, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, transactional outbox messaging, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
+Engineered for extreme reliability, throughput, and multi-tenant isolation, the system provides native database-level **PostgreSQL Row-Level Security (RLS)**, least-privilege runtime database roles, compile-time source-generated mediation, an asynchronous **Distributed Outbox Worker with RabbitMQ topic messaging**, a dynamic attribute & schema compilation engine, explicit **Product Variants**, rich PostgreSQL JSONB specifications & localization, time-sortable **UUIDv7** identities, hierarchical taxonomy trees with PostgreSQL `ltree`, automated auditing interceptors, OpenTelemetry observability, rate limiting, and optimistic concurrency control.
 
 ---
 
@@ -21,6 +22,7 @@ Engineered for extreme reliability, throughput, and multi-tenant isolation, the 
 - [Architectural Blueprint](#architectural-blueprint)
 - [Multi-Tenancy & Row-Level Security (RLS)](#multi-tenancy--row-level-security-rls)
 - [Least-Privilege Database Security](#least-privilege-database-security)
+- [Distributed Outbox Worker & RabbitMQ Messaging](#distributed-outbox-worker--rabbitmq-messaging)
 - [Key Engineering Highlights](#key-engineering-highlights)
 - [Solution & Project Decomposition](#solution--project-decomposition)
 - [Technology Matrix](#technology-matrix)
@@ -90,7 +92,16 @@ CommerceCore employs a **Modular Monolith** architecture combined with **Clean A
                               │             Infrastructure Layer             │
                               │  - CommerceCore.Persistence (EF Core 10,     │
                               │    PostgreSQL RLS, Outbox, Interceptors)     │
+                              │  - PlatformReadDbContext (Read-Only Context) │
                               │  - CommerceCore.Infrastructure (Clock)       │
+                              └──────────────────────┬───────────────────────┘
+                                                     │
+                              ┌──────────────────────▼───────────────────────┐
+                              │           Asynchronous Workers               │
+                              │     (CommerceCore.Outbox.Worker)             │
+                              │  - Distributed Outbox Leasing (SKIP LOCKED)  │
+                              │  - Resilient RabbitMQ Event Publisher (7.x)  │
+                              │  - Versioned Integration Event Contracts     │
                               └──────────────────────────────────────────────┘
 ```
 
@@ -100,9 +111,10 @@ CommerceCore employs a **Modular Monolith** architecture combined with **Clean A
 |---|---|---|
 | **Domain** (`Core.Domain`, `Catalog.Domain`) | Pure business models, aggregates, immutable value objects, domain events, domain exceptions, and invariant rules. | **Zero dependencies** on external frameworks, ORMs, or IO libraries. |
 | **Application** (`Core.Application`, `Catalog.Application`) | CQRS use cases, commands, queries, mediator handlers, and validation pipeline behaviors (`ValidationBehavior`). | Depends only on **Domain**. No references to persistence, database drivers, or presentation frameworks. |
-| **Platform** (`Contracts`, `ControlPlane`, `Identity`) | Multi-tenant isolation contracts (`ITenantContext`), tenant control plane entities, storefront resolution, and identity integration. | Shared cross-cutting foundation for functional modules. Read-only at runtime by application role. |
+| **Platform** (`Contracts`, `ControlPlane`, `Identity`) | Multi-tenant isolation contracts (`ITenantContext`), tenant control plane entities, storefront resolution, and identity integration. | Shared cross-cutting foundation for functional modules. Read-only at runtime via `PlatformReadDbContext`. |
 | **Persistence & Infra** | PostgreSQL EF Core 10 DbContext, connection interceptors (`TenantSessionInterceptor`, `AuditingSaveChangesInterceptor`, `OutboxSaveChangesInterceptor`), schema configurations, and migrations. | Implements Application abstractions using concrete PostgreSQL drivers and EF Core mappings. |
 | **Presentation (API)** | Application composition root, Minimal APIs, rate limiting, security headers, authentication, and OpenTelemetry instrumentation. | References application and infrastructure modules to compose the runtime pipeline. |
+| **Workers (`Outbox.Worker`)** | Background dispatcher consuming atomic outbox messages, managing distributed lease locks, and publishing to message brokers. | Independent runtime process consuming persistence and publishing via RabbitMQ. |
 
 ---
 
@@ -123,6 +135,7 @@ Incoming HTTP Request
 ┌────────────────────────────────────────────────────────────┐
 │ 2. TenantResolutionMiddleware                              │
 │    - Resolves Host from request header (case-insensitive)  │
+│    - Queries PlatformReadDbContext (Read-Only Invariant)   │
 │    - Matches Host against platform.storefronts             │
 │    - Extracts user subject from JWT ('sub' / NameId)       │
 │    - Verifies active membership in platform.tenant_members │
@@ -150,6 +163,7 @@ Incoming HTTP Request
 
 - **Defense in Depth**: Even if application-level query filters are bypassed, PostgreSQL RLS physically rejects any query or mutation attempting to touch another tenant's rows.
 - **Parent Tenant Status Enforcement**: Tenant membership resolution verifies that both the membership *and* the parent tenant have active status (`TenantStatuses.Active`). Inactive or suspended tenants are immediately blocked.
+- **PlatformReadDbContext Read-Only Guard**: Control plane lookups execute through a specialized DbContext that rejects all mutations (`SaveChanges` / `SaveChangesAsync` throw `NotSupportedException`).
 
 ---
 
@@ -176,11 +190,89 @@ CommerceCore establishes a strict separation of database privileges between runt
 
 1. **Runtime App Role (`commercecore_app`)**:
    - `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`
-   - **`platform` Schema**: Read-only (`SELECT` only). The application cannot create, update, or delete tenants, storefronts, or memberships.
+   - **`platform` Schema**: Read-only (`SELECT` only). The application cannot create, update, or delete tenants, storefronts, or memberships at runtime.
    - **`catalog` and `outbox` Schemas**: `SELECT, INSERT, UPDATE, DELETE` with RLS strictly enforced on every query.
 2. **Migration Role Separation**:
    - `CommerceCoreDbContextFactory` reads `COMMERCECORE_MIGRATIONS_CONNECTION_STRING` for design-time migrations and DDL execution.
-   - Prevents web application connection strings from having schema alteration (DDL) privileges in production.
+   - Prevents web application connection strings from possessing schema alteration (DDL) privileges in production.
+
+---
+
+## Distributed Outbox Worker & RabbitMQ Messaging
+
+CommerceCore implements a production-grade, resilient **Transactional Outbox Worker** (`src/Workers/CommerceCore.Outbox.Worker`) capable of running as multiple horizontal worker nodes without duplicate event deliveries.
+
+```
+       Write Operation (API Request)
+                     │
+                     ▼
+       ┌───────────────────────────┐
+       │ Atomic DB Transaction     │
+       │ 1. Catalog Mutation       │
+       │ 2. Outbox Message Insert  │
+       └─────────────┬─────────────┘
+                     │
+                     ▼
+       ┌───────────────────────────┐
+       │     outbox.messages       │
+       │ (PostgreSQL Database)     │
+       └─────────────┬─────────────┘
+                     │
+                     │  1. ClaimAsync() via FOR UPDATE SKIP LOCKED
+                     │     Sets lease_id & lease_expires_on_utc
+                     ▼
+       ┌───────────────────────────┐
+       │   OutboxDeliveryStore     │
+       └─────────────┬─────────────┘
+                     │
+                     │  2. Map domain event to public contract
+                     ▼
+       ┌───────────────────────────┐
+       │    OutboxEventMapper      │
+       │ (catalog.product.*.v1)    │
+       └─────────────┬─────────────┘
+                     │
+                     │  3. PublishAsync() with Publisher Confirmations
+                     ▼
+       ┌───────────────────────────┐
+       │   RabbitMqEventPublisher  │
+       └─────────────┬─────────────┘
+                     │
+                     ▼
+       ┌───────────────────────────┐
+       │ RabbitMQ Topic Exchange   │
+       │ (Durable, AutoDelete: F)  │
+       └─────────────┬─────────────┘
+                     │
+                     │  4. CompleteAsync() - Clears lease, sets processed_on_utc
+                     ▼
+       ┌───────────────────────────┐
+       │   outbox.messages         │
+       │ (Marked Processed)        │
+       └───────────────────────────┘
+```
+
+### Key Outbox Engineering Capabilities:
+
+1. **Lock-Free Distributed Leasing (`FOR UPDATE SKIP LOCKED`)**:
+   - Outbox messages are claimed using PostgreSQL common table expressions (CTEs) with `FOR UPDATE SKIP LOCKED`. Multiple worker instances process messages concurrently without lock contention or deadlocks.
+   - Each claim sets a unique `lease_id` and `lease_expires_on_utc`.
+2. **Automatic Crash Recovery & Resilient Leases**:
+   - If a worker crashes or encounters network partition while processing, the lease expires automatically (`lease_expires_on_utc <= statement_timestamp()`). Another worker claims and retries the message seamlessly.
+3. **Exponential Backoff & Dead-Letter Queueing**:
+   - Failed publications increment `attempt_count` and calculate `next_attempt_on_utc` using exponential backoff (from 5s up to 300s).
+   - Poison messages exceeding `MaximumAttempts = 5` are automatically moved to terminal dead-letter state (`dead_lettered_on_utc = statement_timestamp()`).
+4. **Resilient RabbitMQ Publisher (RabbitMQ.Client 7.x)**:
+   - Built on modern asynchronous channel APIs with **Publisher Confirmations** (`CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: true)`).
+   - Publishes to durable Topic Exchanges declared by `RabbitMqTopologyInitializer`.
+   - Strict 10-second confirmation timeouts with Semaphore-protected single-channel concurrency.
+5. **Versioned Integration Event Contracts**:
+   - `OutboxEventMapper` transforms internal domain events into public integration event contracts:
+     - `ProductCreatedDomainEvent` $
+ightarrow$ `catalog.product.created.v1`
+     - `ProductArchivedDomainEvent` $
+ightarrow$ `catalog.product.archived.v1`
+   - Strict payload validation ensuring event ID equals outbox message ID, valid timestamps, and non-empty tenant IDs.
 
 ---
 
@@ -188,19 +280,22 @@ CommerceCore establishes a strict separation of database privileges between runt
 
 - **Compile-Time Source-Generated Mediator**: Utilizes `Mediator.SourceGenerator` for zero-reflection, high-throughput CQRS dispatching with compile-time pipeline behaviors (`ValidationBehavior`).
 - **PostgreSQL Row-Level Security (RLS)**: Automatic tenant session binding (`set_config('app.tenant_id', ...)`) ensuring bulletproof multi-tenant isolation.
-- **Least-Privilege Database Role**: Hardened runtime app role with read-only access to control plane metadata and enforced RLS.
+- **Distributed Outbox Worker**: High-throughput message dispatching using `FOR UPDATE SKIP LOCKED`, distributed leases, exponential backoff, dead-letter tracking, and RabbitMQ publisher confirmations.
+- **Least-Privilege Database Role**: Hardened runtime app role (`commercecore_app`) with read-only access to control plane metadata and enforced RLS.
+- **Read-Only Context Guard**: `PlatformReadDbContext` physically rejects write operations on control-plane metadata at runtime.
 - **Explicit Product Variants**: Matrix variations with custom SKUs, variant pricing, currency parity validation, default variant assignment, and dynamic variant option bags.
 - **Dynamic Attribute Schema & Versioning**: Strongly-typed attributes (`Text`, `Integer`, `Decimal`, `Boolean`, `SingleSelect`, `MultiSelect`, `Measurement`) with scopes, validation bounds, enforcement states (`Draft`, `Backfilling`, `Enforced`, `Deprecated`), and compiled JSONB effective schemas.
 - **Native UUIDv7 Primary Keys**: Uses .NET 10's native `Guid.CreateVersion7()` for time-sortable sequential identifiers, eliminating B-Tree index fragmentation and boosting PostgreSQL write throughput.
 - **Hierarchical Product Taxonomies (`ltree`)**: Dynamic category and product type hierarchies backed by PostgreSQL's native `ltree` extension with GiST indexing for fast subtree queries.
 - **Multilingual Localization via PostgreSQL JSONB**: Localized fields (`LocalizedText`, `LanguageCode`) stored directly as native PostgreSQL `jsonb` with custom EF Core value converters, value comparers, and RFC language-tag validation.
-- **Transactional Outbox Pattern**: Domain events (`ProductCreatedDomainEvent`, `ProductArchivedDomainEvent`) are automatically serialized into the `outbox.messages` table within the same atomic database transaction via EF Core interceptors (`OutboxSaveChangesInterceptor`).
+- **Transactional Outbox Interceptor**: Domain events are automatically serialized into `outbox.messages` within the same atomic database transaction via EF Core interceptors (`OutboxSaveChangesInterceptor`).
 - **Automated Auditing Interceptor**: EF Core `AuditingSaveChangesInterceptor` automatically stamps `CreatedAtUtc`, `CreatedBy`, `UpdatedAtUtc`, and `UpdatedBy` across entities and nested owned entities without polluting command handlers.
 - **Optimistic Concurrency via PostgreSQL `xmin`**: Uses PostgreSQL system column `xmin` (`IsRowVersion()`) to detect concurrent modifications and automatically return HTTP `409 Conflict` problem details.
 - **Pre-Resolution Rate Limiting**: Built-in sliding-window rate limiter executing before tenant resolution to prevent tenant enumeration and denial of service.
+- **Client-Aborted Request Suppression**: Global exception handler gracefully detects cancelled client requests, suppressing unnecessary error payloads and noisy logs.
 - **OpenTelemetry & Observability**: Complete distributed tracing, metrics, and structured logging integrated with OTLP exporters.
 - **High-Performance Logging**: Zero-allocation compile-time `[LoggerMessage]` source-generated logging in exception handlers.
-- **Automated Verification**: **234+ tests** across architectural boundaries (`NetArchTest`), domain invariants (`xUnit v3`), API integration, and real PostgreSQL integration tests (`Testcontainers.PostgreSql`).
+- **Automated Verification**: **250+ tests** across architectural boundaries (`NetArchTest`), domain invariants (`xUnit v3`), API integration, RabbitMQ integration, and PostgreSQL integration tests (`Testcontainers`).
 
 ---
 
@@ -209,7 +304,7 @@ CommerceCore establishes a strict separation of database privileges between runt
 ```text
 CommerceCore/
 ├── CommerceCore.slnx                                   # Modern solution manifest (.slnx)
-├── docker-compose.yml                                  # Local development infrastructure (PostgreSQL 18.6 & pgAdmin 4)
+├── docker-compose.yml                                  # Local infrastructure (PostgreSQL 18.6, RabbitMQ 4.3, pgAdmin 4)
 ├── Dockerfile                                          # Multi-stage production container build
 ├── Directory.Build.props                               # WarningsAsErrors & AnalysisLevel latest-recommended
 ├── .editorconfig                                       # Standardized code style & analyzer rules
@@ -233,15 +328,19 @@ CommerceCore/
 │   │
 │   ├── Infrastructure/
 │   │   ├── CommerceCore.Infrastructure/                # System implementations (SystemClock)
-│   │   └── CommerceCore.Persistence/                   # PostgreSQL EF Core 10 DbContext, RLS Migrations, Interceptors
+│   │   └── CommerceCore.Persistence/                   # PostgreSQL EF Core 10 DbContext, PlatformReadDbContext, Outbox
 │   │
-│   └── Presentation/
-│       └── CommerceCore.Api/                           # Minimal APIs, RateLimiting, Security, Observability, Program.cs
+│   ├── Presentation/
+│   │   └── CommerceCore.Api/                           # Minimal APIs, RateLimiting, Security, Observability, Program.cs
+│   │
+│   └── Workers/
+│       └── CommerceCore.Outbox.Worker/                 # Asynchronous Outbox Dispatcher & RabbitMQ Topic Publisher
 │
 ├── tests/
 │   ├── CommerceCore.Domain.UnitTests/                  # 150 Tests: Domain entities, invariants, value objects
-│   ├── CommerceCore.Persistence.IntegrationTests/      # 44+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
-│   ├── CommerceCore.Api.UnitTests/                     # 30 Tests: Endpoint parsers, auth regression, middleware
+│   ├── CommerceCore.Persistence.IntegrationTests/      # 47+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
+│   ├── CommerceCore.Api.UnitTests/                     # 37 Tests: Endpoint parsers, auth regression, entity validation
+│   ├── CommerceCore.Outbox.Worker.IntegrationTests/    # 10+ Tests: Outbox dispatcher, event mapper, RabbitMQ publisher
 │   └── CommerceCore.ArchitectureTests/                 # 10 Tests: Architecture & Layer boundary rules (NetArchTest)
 │
 └── tools/
@@ -258,13 +357,15 @@ CommerceCore/
 | **ASP.NET Core** | 10.0 | High-performance Minimal APIs & OpenAPI integration |
 | **Entity Framework Core** | 10.0.11 | Modern ORM with PostgreSQL provider (`Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3) |
 | **PostgreSQL** | 18.6 | Relational database with native `ltree`, `jsonb`, Row-Level Security (RLS), and `xmin` |
+| **RabbitMQ** | 4.3 (Management) | Message broker with AMQP 0-9-1 Topic Exchanges & publisher confirmations |
+| **RabbitMQ.Client** | 7.1.1 | Official asynchronous .NET client for RabbitMQ messaging |
 | **Mediator (Source Generator)** | 3.0.2 | Zero-reflection compile-time CQRS messaging & pipeline execution |
 | **FluentValidation** | 12.1.1 | Strongly-typed request & business validation rules |
 | **OpenTelemetry** | 1.11.2 | Distributed tracing, metrics, and structured logging export |
-| **xUnit** | v3 (4.0.0) | Unit & integration testing framework |
+| **xUnit** | v3 (4.0.0) | Modern testing framework |
 | **NetArchTest.eNhancedEdition**| 1.4.5 | Automated architecture rule enforcement |
-| **Testcontainers.PostgreSql** | 4.14.0 | Disposable PostgreSQL containers for integration tests |
-| **Docker Compose** | - | Local development infrastructure (PostgreSQL & pgAdmin) |
+| **Testcontainers** | 4.14.0 | Disposable PostgreSQL and RabbitMQ containers for integration tests |
+| **Docker Compose** | - | Local development infrastructure (PostgreSQL, RabbitMQ & pgAdmin) |
 
 ---
 
@@ -310,22 +411,26 @@ Inherits `AggregateRoot<ProductTypeId>`:
 - **Hierarchy & Taxonomies**: Modeled via `ParentProductTypeId` and PostgreSQL `ltree` `path`.
 - **Assignment Control**: `IsAssignable` indicates whether concrete products can be assigned to this type.
 - **Effective Schema**: `OwnSchemaVersion` increments on changes, compiling into `ProductTypeEffectiveSchema` for fast runtime validation.
+- **Concurrency Coordinator**: Attribute definitions are coordinated within critical sections, preventing race conditions during concurrent additions.
 
 #### Attribute Definitions (`AttributeDefinition`):
 - **Key & Ordering**: Strongly-typed `AttributeKey` and unique `DisplayOrder`.
 - **Data Types**: `Text`, `Integer`, `Decimal`, `Boolean`, `SingleSelect`, `MultiSelect`, `Measurement`.
 - **Scope**: `ProductSpecification` (product-level property) or `VariantOption` (matrix variation axis).
 - **Validation Bounds**: `MinimumValue`, `MaximumValue`, `MinimumLength`, `MaximumLength`, and `MeasurementUnitFamily`.
-- **Enforcement Lifecycle**: `Draft` $ightarrow$ `Backfilling` $ightarrow$ `Enforced` $ightarrow$ `Deprecated`.
+- **Enforcement Lifecycle**: `Draft` $
+ightarrow$ `Backfilling` $
+ightarrow$ `Enforced` $
+ightarrow$ `Deprecated`.
 
 ---
 
 ### 3. Platform Control Plane & Multi-Tenancy
 
-- **`Tenant`**: Represents the isolated organization (`Id`, `Name`, `Slug`, `Status`, `CreatedAtUtc`).
-- **`Storefront`**: E-commerce sales channel mapped to a tenant (`Id`, `TenantId`, `HostName`, `MarketCode`, `DefaultLocale`, `IsActive`). Hostnames are enforced lowercase via database check constraint.
-- **`TenantMembership`**: Maps user subjects to tenants with roles (`TenantId`, `UserSubject`, `Role`, `Status`).
-- **Type-Safe Constants**: `TenantStatuses.Active`, `TenantMembershipStatuses.Active`, `TenantMembershipRoles.Admin`.
+- **`Tenant`**: Encapsulated entity with factory method `Tenant.Create(id, slug, name)`. Normalized slug and lifecycle methods (`Activate()`, `Deactivate()`).
+- **`Storefront`**: Encapsulated entity with factory method `Storefront.Create(id, tenantId, hostName, marketId)`. Validated host name (`Uri.CheckHostName`) and lifecycle methods.
+- **`TenantMembership`**: Encapsulated entity with factory method `TenantMembership.Create(tenantId, userSubject, role)`.
+- **Type-Safe Constants**: `TenantStatuses.Active`, `TenantStatuses.Inactive`, `TenantMembershipStatuses.Active`, `TenantMembershipStatuses.Inactive`, `TenantMembershipRoles.Admin`.
 
 ---
 
@@ -352,7 +457,8 @@ CREATE TABLE platform.tenants (
     slug varchar(100) NOT NULL,
     status varchar(50) NOT NULL,
     created_at_utc timestamp with time zone NOT NULL,
-    CONSTRAINT pk_tenants PRIMARY KEY (id)
+    CONSTRAINT pk_tenants PRIMARY KEY (id),
+    CONSTRAINT ck_platform_tenants_status CHECK (status IN ('Active', 'Inactive'))
 );
 CREATE UNIQUE INDEX ix_platform_tenants_slug ON platform.tenants (slug);
 ```
@@ -371,6 +477,19 @@ CREATE TABLE platform.storefronts (
     CONSTRAINT ck_platform_storefronts_host_name_lowercase CHECK (host_name = lower(host_name))
 );
 CREATE UNIQUE INDEX ix_platform_storefronts_host_name ON platform.storefronts (host_name);
+```
+
+#### `platform.tenant_memberships`
+```sql
+CREATE TABLE platform.tenant_memberships (
+    tenant_id uuid NOT NULL,
+    user_subject varchar(200) NOT NULL,
+    role varchar(50) NOT NULL,
+    status varchar(50) NOT NULL,
+    CONSTRAINT pk_tenant_memberships PRIMARY KEY (tenant_id, user_subject),
+    CONSTRAINT fk_tenant_memberships_tenants FOREIGN KEY (tenant_id) REFERENCES platform.tenants (id) ON DELETE CASCADE,
+    CONSTRAINT ck_platform_tenant_memberships_status CHECK (status IN ('Active', 'Inactive'))
+);
 ```
 
 #### `catalog.products`
@@ -416,60 +535,6 @@ CREATE TABLE catalog.product_variants (
 );
 ```
 
-#### `catalog.product_types`
-```sql
-CREATE TABLE catalog.product_types (
-    id uuid NOT NULL,
-    tenant_id uuid NOT NULL,
-    code varchar(64) NOT NULL,
-    parent_product_type_id uuid NULL,
-    path ltree NOT NULL,
-    is_assignable boolean NOT NULL DEFAULT FALSE,
-    own_schema_version bigint NOT NULL DEFAULT 0,
-    created_at_utc timestamp with time zone NOT NULL,
-    created_by varchar(200) NULL,
-    updated_at_utc timestamp with time zone NULL,
-    updated_by varchar(200) NULL,
-    xmin xid NOT NULL,
-    CONSTRAINT pk_product_types PRIMARY KEY (id),
-    CONSTRAINT ux_product_types_tenant_id_id UNIQUE (tenant_id, id)
-);
-```
-
-#### `catalog.attribute_definitions` & `catalog.attribute_options`
-```sql
-CREATE TABLE catalog.attribute_definitions (
-    id uuid NOT NULL,
-    tenant_id uuid NOT NULL,
-    product_type_id uuid NOT NULL,
-    key varchar(64) NOT NULL,
-    data_type varchar(32) NOT NULL,
-    scope varchar(32) NOT NULL,
-    is_required boolean NOT NULL,
-    enforcement_status varchar(32) NOT NULL,
-    is_deprecated boolean NOT NULL DEFAULT FALSE,
-    display_order integer NOT NULL,
-    minimum_value numeric(18,4) NULL,
-    maximum_value numeric(18,4) NULL,
-    minimum_length integer NULL,
-    maximum_length integer NULL,
-    measurement_unit_family varchar(64) NULL,
-    CONSTRAINT pk_attribute_definitions PRIMARY KEY (id),
-    CONSTRAINT ux_attribute_definitions_tenant_id_id UNIQUE (tenant_id, id)
-);
-
-CREATE TABLE catalog.attribute_options (
-    id uuid NOT NULL,
-    tenant_id uuid NOT NULL,
-    attribute_definition_id uuid NOT NULL,
-    code varchar(64) NOT NULL,
-    display_order integer NOT NULL,
-    is_deprecated boolean NOT NULL DEFAULT FALSE,
-    CONSTRAINT pk_attribute_options PRIMARY KEY (id),
-    CONSTRAINT ux_attribute_options_tenant_id_id UNIQUE (tenant_id, id)
-);
-```
-
 #### `outbox.messages`
 ```sql
 CREATE TABLE outbox.messages (
@@ -481,7 +546,20 @@ CREATE TABLE outbox.messages (
     processed_on_utc timestamp with time zone NULL,
     attempt_count integer NOT NULL DEFAULT 0,
     last_error text NULL,
-    CONSTRAINT pk_messages PRIMARY KEY (id)
+    lease_id uuid NULL,
+    lease_expires_on_utc timestamp with time zone NULL,
+    next_attempt_on_utc timestamp with time zone NULL,
+    dead_lettered_on_utc timestamp with time zone NULL,
+    CONSTRAINT pk_messages PRIMARY KEY (id),
+    CONSTRAINT ck_outbox_messages_attempt_count CHECK (attempt_count >= 0),
+    CONSTRAINT ck_outbox_messages_lease_pair CHECK ((lease_id IS NULL) = (lease_expires_on_utc IS NULL)),
+    CONSTRAINT ck_outbox_messages_terminal_state CHECK (
+        NOT (processed_on_utc IS NOT NULL AND dead_lettered_on_utc IS NOT NULL)
+        AND (
+            (processed_on_utc IS NULL AND dead_lettered_on_utc IS NULL)
+            OR (lease_id IS NULL AND next_attempt_on_utc IS NULL)
+        )
+    )
 );
 ```
 
@@ -510,7 +588,7 @@ CREATE POLICY tenant_isolation_policy ON catalog.products
 - `ux_product_variants_tenant_default_per_product` on `(tenant_id, product_id) WHERE is_default = TRUE`: Ensures only one default variant per product.
 - `ux_product_types_tenant_code` on `(tenant_id, code)` (Unique): Unique category codes per tenant.
 - `ix_product_types_path_gist` on `path USING gist`: High-performance hierarchical subtree operations (`@>`, `<@`, `~`).
-- `ix_outbox_messages_tenant_pending_occurred_on_utc` on `(tenant_id, occurred_on_utc) WHERE processed_on_utc IS NULL`: Partial index for high-speed outbox processing.
+- `ix_outbox_messages_tenant_dispatch` on `(tenant_id, next_attempt_on_utc, occurred_on_utc, id) WHERE processed_on_utc IS NULL AND dead_lettered_on_utc IS NULL`: High-speed partial index for the outbox worker leasing engine.
 
 ---
 
@@ -552,6 +630,7 @@ Configured via `SecurityHeadersMiddleware`:
 Global exception handling uses compile-time source-generated logging (`[LoggerMessage]`):
 - Avoids boxing and heap allocations during error formatting.
 - Automatically preserves `traceId` correlation tags across all logs.
+- Suppresses error responses when the client disconnects or aborts the HTTP request.
 
 ---
 
@@ -725,7 +804,7 @@ CommerceCore includes an administrative CLI tool (`tools/CommerceCore.Bootstrap`
 
 ```bash
 # Set environment variables for the bootstrap tool
-export COMMERCECORE_BOOTSTRAP_ConnectionStrings__CommerceCoreDatabase="Host=localhost;Port=5432;Database=CommerceCoreDb;Username=postgres;Password=Commerce123!"
+export COMMERCECORE_BOOTSTRAP_ConnectionStrings__CommerceCoreDatabase="Host=localhost;Port=5432;Database=commercecore;Username=commercecore;Password=your_password"
 export COMMERCECORE_BOOTSTRAP_TENANT_SLUG="acme-corp"
 export COMMERCECORE_BOOTSTRAP_TENANT_NAME="Acme Corporation"
 export COMMERCECORE_BOOTSTRAP_HOST_NAME="acme.store.local"
@@ -739,7 +818,7 @@ dotnet run --project tools/CommerceCore.Bootstrap
 
 ### Safety Invariants Enforced by Bootstrap CLI:
 1. **Pending Migrations Check**: Halts immediately if unapplied migrations exist.
-2. **Atomic Execution**: Wraps tenant, storefront, and membership creation in a single transaction.
+2. **Atomic Execution**: Wraps tenant, storefront, and membership creation in a single database transaction.
 3. **Collision Prevention**: Prevents reusing existing slugs with differing tenant names or assigning an admin to multiple tenants.
 4. **Normalized Hostnames**: Validates and normalizes storefront hostnames without protocol or port.
 
@@ -757,17 +836,18 @@ git clone https://github.com/MahirSafar/CommerceCore.git
 cd CommerceCore
 ```
 
-### 2. Configure Environment & Start Services
-Copy `.env.example` to `.env` and start PostgreSQL 18.6 and pgAdmin 4:
+### 2. Configure Environment & Start Infrastructure
+Copy `.env.example` to `.env` and start PostgreSQL 18.6, RabbitMQ 4.3, and pgAdmin 4:
 ```bash
 cp .env.example .env
 docker compose up -d
 ```
-- **PostgreSQL**: `localhost:5432` (User: `CommerceCore`, Database: `CommerceCoreDb`)
-- **pgAdmin 4**: `http://localhost:5050` (Email: `admin@commercecore.com`, Password: `Admin123!`)
+- **PostgreSQL**: `localhost:5432` (User: `commercecore`, Database: `commercecore`)
+- **RabbitMQ**: `localhost:5672` (AMQP) | `http://localhost:15672` (Management UI)
+- **pgAdmin 4**: `http://localhost:5050` (Email: `admin@example.test`)
 
-### 3. Apply EF Core Migrations
-Restore tools and update the database:
+### 3. Apply EF Core Database Migrations
+Restore tools and apply migrations using the administrative migration connection:
 ```bash
 dotnet tool restore
 dotnet ef database update --project src/Infrastructure/CommerceCore.Persistence --startup-project src/Presentation/CommerceCore.Api
@@ -778,12 +858,18 @@ dotnet ef database update --project src/Infrastructure/CommerceCore.Persistence 
 dotnet run --project tools/CommerceCore.Bootstrap
 ```
 
-### 5. Run the API
+### 5. Run the API and Outbox Worker
+Run the Minimal API web application:
 ```bash
 dotnet run --project src/Presentation/CommerceCore.Api
 ```
 The API will start at `https://localhost:7198` (or `http://localhost:5247`).
 OpenAPI documentation is available at `/openapi/v1.json`.
+
+In a separate terminal, launch the Outbox Dispatcher Worker:
+```bash
+dotnet run --project src/Workers/CommerceCore.Outbox.Worker
+```
 
 ---
 
@@ -791,7 +877,7 @@ OpenAPI documentation is available at `/openapi/v1.json`.
 
 The GitHub Actions workflow (`.github/workflows/ci.yml`) enforces automated quality gates on every push and pull request:
 
-1. **Deterministic Build**: Compiles solution in `Release` configuration with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`.
+1. **Deterministic Build**: Compiles solution in `Release` configuration with `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` and `<AnalysisLevel>latest-recommended</AnalysisLevel>`.
 2. **C# Formatting Gate**: Asserts zero formatting divergence:
    ```bash
    dotnet format CommerceCore.slnx --verify-no-changes --no-restore --severity warn
@@ -811,13 +897,14 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) enforces automated qual
 
 ## Testing Strategy & Quality Assurance
 
-The repository includes a comprehensive, multi-tiered testing suite with **234+ passing automated tests**:
+The repository includes a comprehensive, multi-tiered testing suite with **250+ passing automated tests**:
 
 ```text
 tests/
 ├── CommerceCore.Domain.UnitTests/             # 150 Tests: Domain entities, invariants, value objects
-├── CommerceCore.Persistence.IntegrationTests/ # 44+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
-├── CommerceCore.Api.UnitTests/                # 30 Tests: Endpoint parsers, auth regression, middleware
+├── CommerceCore.Persistence.IntegrationTests/ # 47+ Tests: EF Core, PostgreSQL RLS, Outbox with Testcontainers
+├── CommerceCore.Api.UnitTests/                # 37 Tests: Endpoint parsers, auth regression, entity validation
+├── CommerceCore.Outbox.Worker.IntegrationTests/# 10+ Tests: Outbox dispatcher, event mapper, RabbitMQ publisher
 └── CommerceCore.ArchitectureTests/            # 10 Tests: Architecture & Layer boundary rules (NetArchTest)
 ```
 
@@ -839,7 +926,13 @@ Verifies endpoint request/response parsers, rate limiting, and authorization pol
 dotnet test tests/CommerceCore.Api.UnitTests/CommerceCore.Api.UnitTests.csproj
 ```
 
-### Run Integration Tests (Requires Docker)
+### Run Outbox Worker Integration Tests (Requires Docker)
+Spawns RabbitMQ Testcontainers, initializes topology, and verifies resilient publisher confirmations and event mapping:
+```bash
+dotnet test tests/CommerceCore.Outbox.Worker.IntegrationTests/CommerceCore.Outbox.Worker.IntegrationTests.csproj
+```
+
+### Run Persistence Integration Tests (Requires Docker)
 Spawns isolated PostgreSQL containers via Testcontainers, applies migrations, and verifies RLS tenant isolation, outbox transactions, and least-privilege security permissions:
 ```bash
 dotnet test tests/CommerceCore.Persistence.IntegrationTests/CommerceCore.Persistence.IntegrationTests.csproj
@@ -858,9 +951,10 @@ dotnet test CommerceCore.slnx
 - **Clean Architecture & DDD**: Pure domain model, explicit Aggregate Roots, encapsulated business invariants, and immutable Value Objects.
 - **CQRS (Command Query Responsibility Segregation)**: Distinct write commands and read queries with optimized query pipelines.
 - **Compile-Time Source Generation**: Zero-reflection CQRS dispatching with `Mediator.SourceGenerator`.
+- **Distributed Outbox Pattern**: PostgreSQL `FOR UPDATE SKIP LOCKED` distributed leasing paired with RabbitMQ topic messaging.
 - **Pool Multi-Tenancy with RLS**: PostgreSQL Row-Level Security enforcing tenant boundaries directly at the database engine.
 - **Least-Privilege Security**: Hardened runtime app role preventing unauthorized administrative access to platform metadata.
-- **Transactional Outbox**: Guaranteed at-least-once domain event persistence within relational transactions.
+- **Read-Only Context Guard**: Invariant protection ensuring platform metadata is never mutated during API request dispatch.
 - **Hierarchical Taxonomies (`ltree`)**: Native PostgreSQL path indexing for high-speed taxonomy trees.
 - **Optimistic Concurrency Control**: Automatic conflict detection and 409 handling via PostgreSQL `xmin`.
 - **Automated Auditing**: Created and Updated timestamps/actors automatically injected via EF Core Interceptors.
