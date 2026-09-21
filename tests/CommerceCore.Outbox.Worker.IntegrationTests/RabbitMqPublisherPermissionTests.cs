@@ -163,6 +163,94 @@ public sealed class RabbitMqPublisherPermissionTests(RabbitMqFixture fixture) : 
         Assert.Equal(message.MessageId.ToString("D"), received.BasicProperties.MessageId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RestrictedPublisher_CannotCreateOrDeleteExchange(
+        bool deleteExisting)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        string exchangeName = $"permissions.events.{Guid.NewGuid():N}";
+        string targetExchangeName = deleteExisting
+            ? exchangeName
+            : $"permissions.new.{Guid.NewGuid():N}";
+
+        await using IConnection admin = await fixture.ConnectAsync(token);
+        await using IChannel adminChannel = await admin.CreateChannelAsync(
+            cancellationToken: token);
+
+        await adminChannel.ExchangeDeclareAsync(
+            exchange: exchangeName,
+            type: ExchangeType.Topic,
+            durable: true,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: token);
+
+        RabbitMqOptions options = await fixture.CreateRestrictedPublisherAsync(
+            exchangeName,
+            token);
+
+        var factory = new ConnectionFactory
+        {
+            HostName = options.HostName,
+            Port = options.Port,
+            UserName = options.UserName,
+            Password = options.Password,
+            VirtualHost = options.VirtualHost,
+            AutomaticRecoveryEnabled = false
+        };
+
+        await using IConnection restricted = await factory.CreateConnectionAsync(token);
+        await using IChannel restrictedChannel = await restricted.CreateChannelAsync(
+            cancellationToken: token);
+
+        OperationInterruptedException exception = await Assert.ThrowsAnyAsync<OperationInterruptedException>(
+            async () =>
+            {
+                if (deleteExisting)
+                {
+                    await restrictedChannel.ExchangeDeleteAsync(
+                        exchange: targetExchangeName,
+                        ifUnused: false,
+                        cancellationToken: token);
+                }
+                else
+                {
+                    await restrictedChannel.ExchangeDeclareAsync(
+                        exchange: targetExchangeName,
+                        type: ExchangeType.Topic,
+                        durable: true,
+                        autoDelete: false,
+                        arguments: null,
+                        cancellationToken: token);
+                }
+            });
+
+        Assert.NotNull(exception.ShutdownReason);
+        Assert.Equal((ushort)403, exception.ShutdownReason.ReplyCode);
+
+        if (deleteExisting)
+        {
+            // Qadağan delete mövcud exchange-i silməməlidir.
+            await adminChannel.ExchangeDeclarePassiveAsync(
+                exchange: targetExchangeName,
+                cancellationToken: token);
+        }
+        else
+        {
+            // Qadağan declare yeni exchange yaratmamalıdır.
+            OperationInterruptedException missing = await Assert.ThrowsAnyAsync<OperationInterruptedException>(
+                () => adminChannel.ExchangeDeclarePassiveAsync(
+                    exchange: targetExchangeName,
+                    cancellationToken: token));
+
+            Assert.NotNull(missing.ShutdownReason);
+            Assert.Equal((ushort)404, missing.ShutdownReason.ReplyCode);
+        }
+    }
+
     private static OutboundEvent CreateMessage(string eventType) => new(
         Guid.NewGuid(),
         Guid.NewGuid(),

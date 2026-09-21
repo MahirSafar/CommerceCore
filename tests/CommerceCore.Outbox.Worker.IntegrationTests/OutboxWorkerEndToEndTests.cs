@@ -97,7 +97,8 @@ public sealed class OutboxWorkerEndToEndTests(RabbitMqFixture rabbitMq)
                 cancellationToken: token);
         }
 
-        RabbitMqOptions rabbitOptions = rabbitMq.CreateOptions(exchangeName);
+        RabbitMqOptions rabbitOptions =
+            await rabbitMq.CreateRestrictedPublisherAsync(exchangeName, token);
 
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(
             new HostApplicationBuilderSettings
