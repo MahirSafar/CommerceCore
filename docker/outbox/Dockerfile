@@ -6,6 +6,7 @@ COPY src/Core/CommerceCore.Domain/CommerceCore.Domain.csproj src/Core/CommerceCo
 COPY src/Core/CommerceCore.Application/CommerceCore.Application.csproj src/Core/CommerceCore.Application/
 COPY src/Platform/CommerceCore.Platform.Contracts/CommerceCore.Platform.Contracts.csproj src/Platform/CommerceCore.Platform.Contracts/
 COPY src/Platform/CommerceCore.Platform.ControlPlane/CommerceCore.Platform.ControlPlane.csproj src/Platform/CommerceCore.Platform.ControlPlane/
+COPY src/Modules/Catalog/CommerceCore.Modules.Catalog.Contracts/CommerceCore.Modules.Catalog.Contracts.csproj src/Modules/Catalog/CommerceCore.Modules.Catalog.Contracts/
 COPY src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/CommerceCore.Modules.Catalog.Domain.csproj src/Modules/Catalog/CommerceCore.Modules.Catalog.Domain/
 COPY src/Modules/Catalog/CommerceCore.Modules.Catalog.Application/CommerceCore.Modules.Catalog.Application.csproj src/Modules/Catalog/CommerceCore.Modules.Catalog.Application/
 COPY src/Infrastructure/CommerceCore.Persistence/CommerceCore.Persistence.csproj src/Infrastructure/CommerceCore.Persistence/

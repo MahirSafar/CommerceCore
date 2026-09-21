@@ -167,6 +167,30 @@ public sealed class LayerDependencyTests
             "CommerceCore.Api");
     }
 
+    [Fact]
+    public void CatalogContracts_Must_Not_Depend_On_Implementation_Or_Domain()
+    {
+        AssertHasNoDependencyOn(
+            LoadAssembly("CommerceCore.Modules.Catalog.Contracts"),
+            "CommerceCore.Domain",
+            "CommerceCore.Application",
+            "CommerceCore.Modules.Catalog.Domain",
+            "CommerceCore.Modules.Catalog.Application",
+            "CommerceCore.Platform.Contracts",
+            "CommerceCore.Platform.ControlPlane",
+            "CommerceCore.Platform.Identity",
+            "CommerceCore.Persistence",
+            "CommerceCore.Infrastructure",
+            "CommerceCore.Api",
+            "CommerceCore.Outbox.Worker",
+            "Microsoft.EntityFrameworkCore",
+            "Microsoft.AspNetCore",
+            "Npgsql",
+            "RabbitMQ.Client",
+            "Mediator",
+            "FluentValidation");
+    }
+
     private static void AssertHasNoDependencyOn(
         Assembly assembly,
         params string[] forbiddenDependencies)

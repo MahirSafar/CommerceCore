@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CommerceCore.Modules.Catalog.Contracts.Events;
 using CommerceCore.Persistence.Outbox;
 
 namespace CommerceCore.Outbox.Worker.Messaging;
@@ -21,8 +22,8 @@ public static class OutboxEventMapper
 
         string eventType = message.Type switch
         {
-            ProductCreatedSource => "catalog.product.created.v1",
-            ProductArchivedSource => "catalog.product.archived.v1",
+            ProductCreatedSource => CatalogEventTypes.ProductCreatedV1,
+            ProductArchivedSource => CatalogEventTypes.ProductArchivedV1,
             _ => throw new NotSupportedException(
                 "The outbox event type has no integration contract.")
         };
@@ -86,11 +87,4 @@ public static class OutboxEventMapper
 
         return value;
     }
-
-    private sealed record ProductLifecycleEventV1(
-        Guid MessageId,
-        Guid TenantId,
-        string Type,
-        DateTimeOffset OccurredOnUtc,
-        Guid ProductId);
 }
