@@ -13,4 +13,21 @@ public sealed class Storefront
 
     public StorefrontId StorefrontId => StorefrontId.From(Id);
     public MarketId MarketId => MarketId.From(MarketCode);
+
+    public static Storefront Create(
+        StorefrontId id,
+        TenantId tenantId,
+        string hostName,
+        MarketId marketId,
+        string defaultLocale) => new()
+        {
+            Id = id.Value,
+            TenantId = tenantId,
+            HostName = hostName,
+            MarketCode = marketId.Code,
+            DefaultLocale = defaultLocale,
+            IsActive = true
+        };
+
+    public void Deactivate() => IsActive = false;
 }

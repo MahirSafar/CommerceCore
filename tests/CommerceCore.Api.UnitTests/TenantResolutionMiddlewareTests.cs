@@ -55,7 +55,7 @@ public sealed class TenantResolutionMiddlewareTests
             });
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(ctx =>
+        var middleware = CreatePipeline(ctx =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -85,7 +85,7 @@ public sealed class TenantResolutionMiddlewareTests
             .Returns((Storefront?)null);
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(ctx =>
+        var middleware = CreatePipeline(ctx =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -140,7 +140,7 @@ public sealed class TenantResolutionMiddlewareTests
             });
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
+        var middleware = CreatePipeline(_ =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -190,7 +190,7 @@ public sealed class TenantResolutionMiddlewareTests
             .Returns((TenantMembership?)null);
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
+        var middleware = CreatePipeline(_ =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -235,7 +235,7 @@ public sealed class TenantResolutionMiddlewareTests
             .Returns((TenantMembership?)null);
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
+        var middleware = CreatePipeline(_ =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -261,7 +261,7 @@ public sealed class TenantResolutionMiddlewareTests
 
         var nextCalled = false;
 
-        var middleware = new TenantResolutionMiddleware(ctx =>
+        var middleware = CreatePipeline(ctx =>
         {
             nextCalled = true;
             return Task.CompletedTask;
@@ -271,5 +271,205 @@ public sealed class TenantResolutionMiddlewareTests
 
         Assert.False(nextCalled);
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resolution_Alone_Does_Not_Require_Membership()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/products";
+        context.Request.Host = new HostString("store.example.com");
+
+        TenantId tenantId = TenantId.New();
+
+        _tenantStore.GetStorefrontByHostAsync(
+                "store.example.com",
+                Arg.Any<CancellationToken>())
+            .Returns(Storefront.Create(
+                StorefrontId.New(),
+                tenantId,
+                "store.example.com",
+                MarketId.From("AZ"),
+                "az-AZ"));
+
+        bool nextCalled = false;
+
+        var middleware = new TenantResolutionMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.True(nextCalled);
+        Assert.True(HttpTenantContext.HasResolvedTenant(context));
+
+        await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
+            Arg.Any<TenantId>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Pipeline_Rejects_Unauthenticated_Identity(
+        bool includeSubjectClaim)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/products";
+        context.Request.Host = new HostString("store.example.com");
+
+        // A claim does not make an identity authenticated.
+        var identity = new ClaimsIdentity();
+
+        if (includeSubjectClaim)
+        {
+            identity.AddClaim(new Claim("sub", "untrusted-user"));
+        }
+
+        context.User = new ClaimsPrincipal(identity);
+
+        _tenantStore.GetStorefrontByHostAsync(
+                "store.example.com",
+                Arg.Any<CancellationToken>())
+            .Returns(Storefront.Create(
+                StorefrontId.New(),
+                TenantId.New(),
+                "store.example.com",
+                MarketId.From("AZ"),
+                "az-AZ"));
+
+        bool nextCalled = false;
+
+        var middleware = CreatePipeline(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.False(nextCalled);
+        Assert.Equal(
+            StatusCodes.Status401Unauthorized,
+            context.Response.StatusCode);
+
+        await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
+            Arg.Any<TenantId>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Membership_Rejects_Missing_Tenant_Context()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/products";
+
+        bool nextCalled = false;
+
+        var middleware = new TenantMembershipMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            middleware.InvokeAsync(
+                context,
+                _tenantStore,
+                TenantContext.Empty));
+
+        Assert.False(nextCalled);
+    }
+
+    [Fact]
+    public async Task Pipeline_Rejects_Inactive_Storefront()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/products";
+        context.Request.Host = new HostString("store.example.com");
+
+        var storefront = Storefront.Create(
+            StorefrontId.New(),
+            TenantId.New(),
+            "store.example.com",
+            MarketId.From("AZ"),
+            "az-AZ");
+
+        storefront.Deactivate();
+
+        _tenantStore.GetStorefrontByHostAsync(
+                "store.example.com",
+                Arg.Any<CancellationToken>())
+            .Returns(storefront);
+
+        bool nextCalled = false;
+
+        var middleware = CreatePipeline(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.False(nextCalled);
+        Assert.False(HttpTenantContext.HasResolvedTenant(context));
+        Assert.Equal(
+            StatusCodes.Status400BadRequest,
+            context.Response.StatusCode);
+
+        await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
+            Arg.Any<TenantId>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Pipeline_Skips_NonApi_Routes()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/health/live";
+
+        bool nextCalled = false;
+
+        var middleware = CreatePipeline(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(context, _tenantStore);
+
+        Assert.True(nextCalled);
+
+        await _tenantStore.DidNotReceive().GetStorefrontByHostAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+
+        await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
+            Arg.Any<TenantId>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    private TenantResolutionMiddleware CreatePipeline(RequestDelegate next)
+    {
+        var membershipMiddleware = new TenantMembershipMiddleware(next);
+
+        return new TenantResolutionMiddleware(context =>
+        {
+            ITenantContext tenantContext =
+                context.Items["__TenantContext"] as ITenantContext ??
+                TenantContext.Empty;
+
+            return membershipMiddleware.InvokeAsync(
+                context,
+                _tenantStore,
+                tenantContext);
+        });
     }
 }
