@@ -1,6 +1,7 @@
 using CommerceCore.Modules.Catalog.Application.Common.Abstractions.Persistence;
 using CommerceCore.Persistence.ControlPlane;
 using CommerceCore.Persistence.Interceptors;
+using CommerceCore.Persistence.Products;
 using CommerceCore.Persistence.ProductTypes;
 using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane;
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IProductTypeEffectiveSchemaReader, ProductTypeEffectiveSchemaReader>();
         services.AddScoped<IAttributeDefinitionRegistry, AttributeDefinitionRegistry>();
         services.AddScoped<IPlatformTenantStore, PlatformTenantStore>();
+        services.AddScoped<IStorefrontProductReader, StorefrontProductReader>();
 
         services.AddDbContext<PlatformReadDbContext>(options =>
         {
