@@ -260,7 +260,9 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
 
         foreach (RouteEndpoint endpoint in endpoints)
         {
-            if (endpoint.RoutePattern.RawText == "/api/storefront/products")
+            if (endpoint.RoutePattern.RawText is
+                "/api/storefront/products" or
+                "/api/storefront/products/{productId:guid}")
             {
                 Assert.NotNull(
                     endpoint.Metadata.GetMetadata<PublicStorefrontReadMetadata>());

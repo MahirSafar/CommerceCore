@@ -188,4 +188,115 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         string Name,
         decimal BasePriceAmount,
         string Currency);
+
+    [Fact]
+    public async Task Details_ReturnOnlyActiveVariants_WithinHostTenant()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        using HttpClient client = fixture.CreateClient(
+            fixture.StoreA.HostName);
+
+        Guid productId = fixture.StoreA.VisibleProductIds[0];
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{productId}?tenantId={fixture.StoreB.TenantId}",
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore == true);
+
+        ProductDetails? details = await response.Content
+            .ReadFromJsonAsync<ProductDetails>(
+                cancellationToken: cancellationToken);
+
+        Assert.NotNull(details);
+        Assert.Equal(productId, details.ProductId);
+        Assert.Equal(fixture.StoreA.ProductTypeId, details.ProductTypeId);
+        Assert.Equal("Storefront product", details.Name);
+        Assert.Equal(10m, details.BasePriceAmount);
+        Assert.Equal("AZN", details.Currency);
+
+        VariantDetails variant = Assert.Single(details.Variants);
+
+        Assert.Equal(
+            fixture.StoreA.FirstProductDefaultVariantId,
+            variant.ProductVariantId);
+
+        Assert.True(variant.IsDefault);
+        Assert.False(string.IsNullOrWhiteSpace(variant.Sku));
+        Assert.Equal(10m, variant.BasePriceAmount);
+        Assert.Equal("AZN", variant.Currency);
+    }
+
+    [Fact]
+    public async Task Details_ForeignHiddenAndMissingProducts_ReturnNotFound()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        using HttpClient client = fixture.CreateClient(
+            fixture.StoreA.HostName);
+
+        IEnumerable<Guid> invisibleIds = fixture.StoreA.HiddenProductIds
+            .Concat(fixture.StoreB.VisibleProductIds)
+            .Append(Guid.NewGuid());
+
+        foreach (Guid productId in invisibleIds)
+        {
+            using HttpResponseMessage response = await client.GetAsync(
+                $"{ProductsPath}/{productId}",
+                cancellationToken);
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            Assert.True(response.Headers.CacheControl?.NoStore == true);
+
+            string body = await response.Content.ReadAsStringAsync(
+                cancellationToken);
+
+            Assert.Empty(body);
+        }
+    }
+
+    [Fact]
+    public async Task Details_EmptyProductId_ReturnsBadRequest()
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.StoreA.HostName);
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{Guid.Empty}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Details_UnknownStorefront_ReturnsBadRequest()
+    {
+        using HttpClient client = fixture.CreateClient(
+            "unknown.example.com");
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{fixture.StoreA.VisibleProductIds[0]}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    public sealed record ProductDetails(
+        Guid ProductId,
+        Guid ProductTypeId,
+        string Name,
+        decimal BasePriceAmount,
+        string Currency,
+        VariantDetails[] Variants);
+
+    public sealed record VariantDetails(
+        Guid ProductVariantId,
+        string Sku,
+        decimal BasePriceAmount,
+        string Currency,
+        bool IsDefault);
 }

@@ -197,7 +197,9 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
             tenantId.Value,
             hostName,
             productType.Id.Value,
-            [first.Id.Value, second.Id.Value]);
+            [first.Id.Value, second.Id.Value],
+            [draft.Id.Value, inactive.Id.Value, archived.Id.Value],
+            first.Variants.Single(variant => variant.IsDefault).Id.Value);
     }
 
     private static Product CreateProduct(
@@ -226,13 +228,33 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
 
         if (activate)
         {
-            ProductVariant variant = product.AddVariant(
+            ProductVariant defaultVariant = product.AddVariant(
                 VariantSku.Create($"sku_{Guid.NewGuid():N}"[..20]),
                 price,
                 AttributeValueBag.Empty,
                 isDefault: true);
 
-            product.ActivateVariant(variant.Id);
+            product.ActivateVariant(defaultVariant.Id);
+
+            product.AddVariant(
+                VariantSku.Create($"sku_{Guid.NewGuid():N}"[..20]),
+                price,
+                AttributeValueBag.Empty.With(
+                    AttributeKey.Create("size"),
+                    AttributeValue.Text.Create("small")),
+                isDefault: false);
+
+            ProductVariant inactiveVariant = product.AddVariant(
+                VariantSku.Create($"sku_{Guid.NewGuid():N}"[..20]),
+                price,
+                AttributeValueBag.Empty.With(
+                    AttributeKey.Create("size"),
+                    AttributeValue.Text.Create("large")),
+                isDefault: false);
+
+            product.ActivateVariant(inactiveVariant.Id);
+            product.DeactivateVariant(inactiveVariant.Id);
+
             product.Activate();
         }
 
@@ -243,7 +265,9 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
         Guid TenantId,
         string HostName,
         Guid ProductTypeId,
-        IReadOnlyList<Guid> VisibleProductIds);
+        IReadOnlyList<Guid> VisibleProductIds,
+        IReadOnlyList<Guid> HiddenProductIds,
+        Guid FirstProductDefaultVariantId);
 
     private sealed class SeedUser : ICurrentUser
     {
