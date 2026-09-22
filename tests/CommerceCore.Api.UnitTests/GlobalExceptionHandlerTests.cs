@@ -178,4 +178,4 @@ public sealed class GlobalExceptionHandlerTests
         Assert.True(handled);
         Assert.Equal(0, context.Response.Body.Length);
     }
-}
+}

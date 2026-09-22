@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\Platform\CommerceCore.Platform.Identity\CommerceCore.Platform.Identity.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\CommerceCore.Modules.Catalog.Domain\CommerceCore.Modules.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\CommerceCore.Modules.Catalog.Application\CommerceCore.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\CommerceCore.Modules.Catalog.Contracts\CommerceCore.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
