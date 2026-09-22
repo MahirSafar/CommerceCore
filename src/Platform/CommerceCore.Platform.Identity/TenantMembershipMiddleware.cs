@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace CommerceCore.Platform.Identity;
@@ -26,6 +27,12 @@ public sealed class TenantMembershipMiddleware(RequestDelegate next)
         {
             throw new InvalidOperationException(
                 "Tenant resolution must run before tenant membership validation.");
+        }
+
+        if (IsPublicStorefrontRead(context))
+        {
+            await next(context);
+            return;
         }
 
         if (context.User.Identity?.IsAuthenticated != true)
@@ -72,5 +79,29 @@ public sealed class TenantMembershipMiddleware(RequestDelegate next)
         }
 
         await next(context);
+    }
+
+    private static bool IsPublicStorefrontRead(HttpContext context)
+    {
+        Endpoint? endpoint = context.GetEndpoint();
+
+        if (endpoint?.Metadata.GetMetadata<PublicStorefrontReadMetadata>() is null)
+        {
+            return false;
+        }
+
+        bool isReadRequest = HttpMethods.IsGet(context.Request.Method) ||
+                             HttpMethods.IsHead(context.Request.Method);
+        bool allowsAnonymous = endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null;
+        bool hasAuthorizationRequirements = endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count > 0;
+
+        if (!isReadRequest || !allowsAnonymous || hasAuthorizationRequirements)
+        {
+            throw new InvalidOperationException(
+                "Public storefront endpoints must be anonymous GET/HEAD endpoints " +
+                "without additional authorization requirements.");
+        }
+
+        return true;
     }
 }
