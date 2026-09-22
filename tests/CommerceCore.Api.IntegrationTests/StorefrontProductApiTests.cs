@@ -228,6 +228,9 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         Assert.False(string.IsNullOrWhiteSpace(variant.Sku));
         Assert.Equal(10m, variant.BasePriceAmount);
         Assert.Equal("AZN", variant.Currency);
+        Assert.NotNull(variant.Options);
+        Assert.Single(variant.Options);
+        Assert.Equal("medium", variant.Options["size"]);
     }
 
     [Fact]
@@ -285,6 +288,35 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Details_VariantWithoutOptions_ReturnsEmptyObject()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        using HttpClient client = fixture.CreateClient(
+            fixture.StoreA.HostName);
+
+        Guid productId = fixture.StoreA.VisibleProductIds[1];
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{productId}",
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        ProductDetails? details = await response.Content
+            .ReadFromJsonAsync<ProductDetails>(
+                cancellationToken: cancellationToken);
+
+        Assert.NotNull(details);
+
+        VariantDetails variant = Assert.Single(details.Variants);
+
+        Assert.NotNull(variant.Options);
+        Assert.Empty(variant.Options);
+    }
+
     public sealed record ProductDetails(
         Guid ProductId,
         Guid ProductTypeId,
@@ -298,5 +330,6 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         string Sku,
         decimal BasePriceAmount,
         string Currency,
-        bool IsDefault);
+        bool IsDefault,
+        Dictionary<string, string> Options);
 }

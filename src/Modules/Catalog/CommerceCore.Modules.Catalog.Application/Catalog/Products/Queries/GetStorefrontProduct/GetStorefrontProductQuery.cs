@@ -18,4 +18,5 @@ public sealed record StorefrontVariantDetails(
     string Sku,
     decimal BasePriceAmount,
     string Currency,
-    bool IsDefault);
+    bool IsDefault,
+    IReadOnlyDictionary<string, string> Options);

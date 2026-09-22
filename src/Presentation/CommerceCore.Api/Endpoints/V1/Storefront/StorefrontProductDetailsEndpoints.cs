@@ -34,7 +34,8 @@ public static class StorefrontProductDetailsEndpoints
                         variant.Sku,
                         variant.BasePriceAmount,
                         variant.Currency,
-                        variant.IsDefault))
+                        variant.IsDefault,
+                        variant.Options))
                     .ToArray();
 
                 return Results.Ok(new ProductDetailsResponse(
@@ -69,5 +70,6 @@ public static class StorefrontProductDetailsEndpoints
         string Sku,
         decimal BasePriceAmount,
         string Currency,
-        bool IsDefault);
+        bool IsDefault,
+        IReadOnlyDictionary<string, string> Options);
 }

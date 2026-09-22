@@ -1,4 +1,5 @@
 using CommerceCore.Application.Catalog.Products.Queries.GetStorefrontProduct;
+using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -55,7 +56,8 @@ public sealed class StorefrontProductDetailsReader(
                         variant.Sku,
                         BasePriceAmount = variant.Price.Amount,
                         variant.Price.Currency,
-                        variant.IsDefault
+                        variant.IsDefault,
+                        variant.Options
                     })
                     .ToArray()
             })
@@ -76,7 +78,8 @@ public sealed class StorefrontProductDetailsReader(
                 variant.Sku.Value,
                 variant.BasePriceAmount,
                 variant.Currency,
-                variant.IsDefault))
+                variant.IsDefault,
+                MapOptions(variant.Options)))
             .ToArray();
 
         return new StorefrontProductDetails(
@@ -86,5 +89,17 @@ public sealed class StorefrontProductDetailsReader(
             row.BasePriceAmount,
             row.Currency,
             variants);
+    }
+
+    private static Dictionary<string, string> MapOptions(
+        AttributeValueBag options)
+    {
+        return options.Values.ToDictionary(
+            pair => pair.Key.Value,
+            pair => pair.Value is AttributeValue.SingleSelect selected
+                ? selected.OptionCode
+                : throw new InvalidOperationException(
+                    "Stored variant options must contain SingleSelect values."),
+            StringComparer.Ordinal);
     }
 }

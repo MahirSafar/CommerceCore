@@ -3,6 +3,7 @@ using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes;
+using CommerceCore.Domain.Catalog.ProductTypes.Enums;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -167,11 +168,36 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
             ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..20]),
             isAssignable: true);
 
+        AttributeDefinition size = productType.DefineAttribute(
+            AttributeKey.Create("size"),
+            AttributeDataType.SingleSelect,
+            AttributeScope.VariantOption,
+            isRequired: false,
+            displayOrder: 0);
+
+        productType.AddAttributeOption(
+            size.Id,
+            AttributeOptionCode.Create("small"),
+            displayOrder: 0);
+
+        productType.AddAttributeOption(
+            size.Id,
+            AttributeOptionCode.Create("medium"),
+            displayOrder: 1);
+
+        productType.AddAttributeOption(
+            size.Id,
+            AttributeOptionCode.Create("large"),
+            displayOrder: 2);
+
         database.ProductTypes.Add(productType);
         await database.SaveChangesAsync(cancellationToken);
 
         Product first = CreateProduct(tenantId, productType.Id);
-        Product second = CreateProduct(tenantId, productType.Id);
+        Product second = CreateProduct(
+            tenantId,
+            productType.Id,
+            includeDefaultOptions: false);
 
         Product draft = CreateProduct(
             tenantId,
@@ -205,7 +231,8 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
     private static Product CreateProduct(
         TenantId tenantId,
         ProductTypeId productTypeId,
-        bool activate = true)
+        bool activate = true,
+        bool includeDefaultOptions = true)
     {
         LanguageCode language = LanguageCode.Create("en");
 
@@ -228,10 +255,16 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
 
         if (activate)
         {
+            AttributeValueBag defaultOptions = includeDefaultOptions
+                ? AttributeValueBag.Empty.With(
+                    AttributeKey.Create("size"),
+                    AttributeValue.SingleSelect.Create("medium"))
+                : AttributeValueBag.Empty;
+
             ProductVariant defaultVariant = product.AddVariant(
                 VariantSku.Create($"sku_{Guid.NewGuid():N}"[..20]),
                 price,
-                AttributeValueBag.Empty,
+                defaultOptions,
                 isDefault: true);
 
             product.ActivateVariant(defaultVariant.Id);
@@ -241,7 +274,7 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
                 price,
                 AttributeValueBag.Empty.With(
                     AttributeKey.Create("size"),
-                    AttributeValue.Text.Create("small")),
+                    AttributeValue.SingleSelect.Create("small")),
                 isDefault: false);
 
             ProductVariant inactiveVariant = product.AddVariant(
@@ -249,7 +282,7 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
                 price,
                 AttributeValueBag.Empty.With(
                     AttributeKey.Create("size"),
-                    AttributeValue.Text.Create("large")),
+                    AttributeValue.SingleSelect.Create("large")),
                 isDefault: false);
 
             product.ActivateVariant(inactiveVariant.Id);
