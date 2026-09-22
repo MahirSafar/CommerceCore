@@ -4,19 +4,19 @@ using RabbitMQ.Client;
 
 namespace CommerceCore.Outbox.Worker.RabbitMq;
 
-public sealed partial class RabbitMqTopologyInitializer(
+public sealed partial class RabbitMqTopologyVerifier(
     IOptions<RabbitMqOptions> options,
-    ILogger<RabbitMqTopologyInitializer> logger)
+    ILogger<RabbitMqTopologyVerifier> logger)
     : IHostedService
 {
     private readonly RabbitMqOptions _options = options.Value;
-    private readonly ILogger<RabbitMqTopologyInitializer> _logger = logger;
+    private readonly ILogger<RabbitMqTopologyVerifier> _logger = logger;
 
     [LoggerMessage(
         EventId = 1,
         Level = LogLevel.Information,
-        Message = "Declared RabbitMQ topic exchange {ExchangeName}.")]
-    private static partial void LogExchangeDeclared(
+        Message = "Verified RabbitMQ exchange {ExchangeName} exists.")]
+    private static partial void LogExchangeVerified(
         ILogger logger,
         string exchangeName);
 
@@ -38,15 +38,11 @@ public sealed partial class RabbitMqTopologyInitializer(
             await connection.CreateChannelAsync(
                 cancellationToken: cancellationToken);
 
-        await channel.ExchangeDeclareAsync(
+        await channel.ExchangeDeclarePassiveAsync(
             exchange: _options.ExchangeName,
-            type: ExchangeType.Topic,
-            durable: true,
-            autoDelete: false,
-            arguments: null,
             cancellationToken: cancellationToken);
 
-        LogExchangeDeclared(_logger, _options.ExchangeName);
+        LogExchangeVerified(_logger, _options.ExchangeName);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) =>

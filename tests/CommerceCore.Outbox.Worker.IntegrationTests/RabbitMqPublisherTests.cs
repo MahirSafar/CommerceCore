@@ -40,6 +40,64 @@ public sealed class RabbitMqFixture : IAsyncLifetime
         };
     }
 
+    public async Task<RabbitMqOptions> CreateRestrictedPublisherAsync(
+        string exchangeName,
+        CancellationToken cancellationToken)
+    {
+        string userName = $"publisher_{Guid.NewGuid():N}";
+        string password = Guid.NewGuid().ToString("N");
+        RabbitMqOptions endpoint = CreateOptions(exchangeName);
+
+        await RunControlCommandAsync(
+            ["add_user", userName, password],
+            cancellationToken);
+
+        await RunControlCommandAsync(
+            [
+                "set_permissions",
+                "-p",
+                endpoint.VirtualHost,
+                userName,
+                "^$",
+                $"^{System.Text.RegularExpressions.Regex.Escape(exchangeName)}$",
+                "^$"
+            ],
+            cancellationToken);
+
+        await RunControlCommandAsync(
+            [
+                "set_topic_permissions",
+                "-p",
+                endpoint.VirtualHost,
+                userName,
+                exchangeName,
+                @"^catalog\.product\.(created|archived)\.v1$",
+                "^$"
+            ],
+            cancellationToken);
+
+        return new RabbitMqOptions
+        {
+            HostName = endpoint.HostName,
+            Port = endpoint.Port,
+            UserName = userName,
+            Password = password,
+            VirtualHost = endpoint.VirtualHost,
+            ExchangeName = exchangeName
+        };
+    }
+
+    private async Task RunControlCommandAsync(
+        string[] arguments,
+        CancellationToken cancellationToken)
+    {
+        var result = await _container.ExecAsync(
+            ["rabbitmqctl", .. arguments],
+            cancellationToken);
+
+        Assert.True(result.ExitCode == 0, result.Stderr);
+    }
+
     private ConnectionFactory CreateFactory() => new()
     {
         Uri = new Uri(_container.GetConnectionString())
