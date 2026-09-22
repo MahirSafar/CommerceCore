@@ -18,5 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Infrastructure\CommerceCore.Persistence\CommerceCore.Persistence.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\CommerceCore.Modules.Catalog.Contracts\CommerceCore.Modules.Catalog.Contracts.csproj" />
   </ItemGroup>
 </Project>

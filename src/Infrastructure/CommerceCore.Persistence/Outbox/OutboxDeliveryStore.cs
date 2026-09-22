@@ -15,7 +15,7 @@ public sealed record LeasedOutboxMessage(
 
 public sealed class OutboxDeliveryStore(
     CommerceCoreDbContext dbContext,
-    ITenantContext tenantContext)
+    ITenantContext tenantContext) : IOutboxDeliveryStore
 {
     private const int MaximumAttempts = 5;
     private const int ExhaustedBatchSize = 100;

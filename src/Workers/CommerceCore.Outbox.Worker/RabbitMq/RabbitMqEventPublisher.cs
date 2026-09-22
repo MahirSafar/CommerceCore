@@ -5,7 +5,8 @@ using RabbitMQ.Client;
 
 namespace CommerceCore.Outbox.Worker.RabbitMq;
 
-public sealed class RabbitMqEventPublisher : IAsyncDisposable
+public sealed class RabbitMqEventPublisher
+    : IEventPublisher, IAsyncDisposable
 {
     private static readonly TimeSpan PublishTimeout = TimeSpan.FromSeconds(10);
     private readonly IConnection _connection;

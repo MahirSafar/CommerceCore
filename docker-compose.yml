@@ -17,6 +17,12 @@ services:
       - postgres_data:/var/lib/postgresql
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   pgadmin:
     image: dpage/pgadmin4:9.17
     container_name: commercecore-pgadmin
@@ -57,6 +63,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  outbox-worker:
+    profiles: ["workers"]
+    image: commercecore-outbox:local
+    build:
+      context: .
+      dockerfile: docker/outbox/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ConnectionStrings__CommerceCoreDatabase: ${COMMERCECORE_OUTBOX_CONNECTION_STRING:-}
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__UserName: ${RABBITMQ_PUBLISHER_USER:-commercecore_publisher}
+      RabbitMq__Password: ${RABBITMQ_PUBLISHER_PASSWORD:-}
+      RabbitMq__VirtualHost: commercecore
+      RabbitMq__ExchangeName: commercecore.events
+      # Intentionally not configurable through .env until consumer bindings are ready.
+      RabbitMq__DispatcherEnabled: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   postgres_data:

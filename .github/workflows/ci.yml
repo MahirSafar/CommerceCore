@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - main
+      - develop
   pull_request:
     branches:
       - master
       - main
+      - develop
   workflow_dispatch:
 
 jobs:
@@ -64,6 +66,12 @@ jobs:
 
       - name: Build API container image
         run: docker build --tag commercecore-api:ci .
+
+      - name: Build outbox worker container image
+        run: docker build --file docker/outbox/Dockerfile --tag commercecore-outbox:ci .
+
+      - name: Validate worker Compose configuration
+        run: docker compose --env-file .env.example --profile workers config --quiet
 
       - name: Run complete test suite
         run: dotnet test CommerceCore.slnx --no-build --configuration Release --verbosity normal
