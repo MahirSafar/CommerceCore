@@ -71,6 +71,7 @@ app.MapHealthCheckEndpoints();
 app.MapProductEndpoints();
 app.MapProductTypeEndpoints();
 app.MapStorefrontProductEndpoints();
+app.MapStorefrontProductDetailsEndpoints();
 
 app.Run();
 
