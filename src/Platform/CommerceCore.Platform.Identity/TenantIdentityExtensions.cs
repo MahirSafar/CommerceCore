@@ -13,8 +13,12 @@ public static class TenantIdentityExtensions
         return services;
     }
 
-    public static IApplicationBuilder UsePlatformTenantResolution(this IApplicationBuilder app)
+    public static IApplicationBuilder UsePlatformTenancy(
+        this IApplicationBuilder app)
     {
-        return app.UseMiddleware<TenantResolutionMiddleware>();
+        app.UseMiddleware<TenantResolutionMiddleware>();
+        app.UseMiddleware<TenantMembershipMiddleware>();
+
+        return app;
     }
 }

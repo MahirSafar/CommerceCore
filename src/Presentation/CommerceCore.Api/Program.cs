@@ -62,7 +62,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseRateLimiter();
-app.UsePlatformTenantResolution();
+app.UsePlatformTenancy();
 app.UseAuthorization();
 
 app.MapHealthCheckEndpoints();
