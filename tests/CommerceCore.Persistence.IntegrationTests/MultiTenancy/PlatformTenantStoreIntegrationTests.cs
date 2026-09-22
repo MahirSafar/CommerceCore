@@ -58,4 +58,47 @@ public sealed class PlatformTenantStoreIntegrationTests
 
         Assert.Null(inactiveTenantMembership);
     }
+
+    [Fact]
+    public async Task GetStorefrontByHostAsync_RequiresActiveParentTenant()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        TenantId tenantId = await _fixture.CreateTenantAsync(cancellationToken);
+        string hostName = $"store-{Guid.NewGuid():N}.example.com";
+
+        await _fixture.CreateStorefrontAsync(
+            tenantId,
+            hostName,
+            cancellationToken);
+
+        await using var scope = _fixture.Services.CreateAsyncScope();
+        var store = scope.ServiceProvider
+            .GetRequiredService<IPlatformTenantStore>();
+
+        var active = await store.GetStorefrontByHostAsync(
+            hostName.ToUpperInvariant() + ".",
+            cancellationToken);
+
+        Assert.NotNull(active);
+        Assert.Equal(tenantId, active.TenantId);
+
+        await _fixture.SetTenantStatusAsync(
+            tenantId,
+            TenantStatuses.Inactive,
+            cancellationToken);
+
+        Assert.Null(await store.GetStorefrontByHostAsync(
+            hostName,
+            cancellationToken));
+
+        await _fixture.SetTenantStatusAsync(
+            tenantId,
+            TenantStatuses.Active,
+            cancellationToken);
+
+        Assert.NotNull(await store.GetStorefrontByHostAsync(
+            hostName,
+            cancellationToken));
+    }
 }

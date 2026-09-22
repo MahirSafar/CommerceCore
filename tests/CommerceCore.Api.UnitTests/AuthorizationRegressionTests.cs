@@ -7,6 +7,7 @@ using NSubstitute;
 using CommerceCore.Api.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using CommerceCore.Platform.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
@@ -259,6 +260,26 @@ public class AuthorizationRegressionTests : IClassFixture<WebApplicationFactory<
 
         foreach (RouteEndpoint endpoint in endpoints)
         {
+            if (endpoint.RoutePattern.RawText == "/api/storefront/products")
+            {
+                Assert.NotNull(
+                    endpoint.Metadata.GetMetadata<PublicStorefrontReadMetadata>());
+                Assert.NotNull(
+                    endpoint.Metadata.GetMetadata<IAllowAnonymous>());
+                Assert.Empty(
+                    endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>());
+
+                var publicMethods = endpoint.Metadata.GetMetadata<HttpMethodMetadata>();
+                Assert.NotNull(publicMethods);
+                Assert.Equal("GET", Assert.Single(publicMethods.HttpMethods));
+                continue;
+            }
+
+            Assert.Null(
+                endpoint.Metadata.GetMetadata<PublicStorefrontReadMetadata>());
+            Assert.Null(
+                endpoint.Metadata.GetMetadata<IAllowAnonymous>());
+
             string[] policies = endpoint.Metadata
                 .GetOrderedMetadata<IAuthorizeData>()
                 .Select(data => data.Policy)
