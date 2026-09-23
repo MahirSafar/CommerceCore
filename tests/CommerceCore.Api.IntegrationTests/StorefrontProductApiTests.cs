@@ -438,6 +438,95 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task VariantPagination_MultiplePages_PreserveVariantDetails()
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.PaginationStore.HostName);
+
+        Guid productId = fixture.PaginationStore.VisibleProductIds[0];
+        string path = $"{ProductsPath}/{productId}";
+
+        ProductDetails complete = await ReadDetailsAsync(
+            client,
+            $"{path}?variantPageSize=50");
+
+        Assert.Equal(25, complete.Variants.Length);
+        Assert.Null(complete.NextAfterVariantId);
+
+        const int pageSize = 7;
+        var collected = new List<VariantDetails>();
+        Guid? cursor = null;
+
+        for (int offset = 0; offset < complete.Variants.Length; offset += pageSize)
+        {
+            string pagePath = $"{path}?variantPageSize={pageSize}";
+            if (cursor is Guid afterVariantId)
+            {
+                pagePath += $"&afterVariantId={afterVariantId}";
+            }
+
+            ProductDetails page = await ReadDetailsAsync(client, pagePath);
+            Assert.Equal(complete.ProductId, page.ProductId);
+            Assert.Equal(complete.Name, page.Name);
+            Assert.Equal(complete.BasePriceAmount, page.BasePriceAmount);
+            Assert.Equal(complete.Currency, page.Currency);
+
+            int expectedCount = Math.Min(
+                pageSize,
+                complete.Variants.Length - offset);
+            Assert.Equal(expectedCount, page.Variants.Length);
+
+            collected.AddRange(page.Variants);
+            cursor = page.NextAfterVariantId;
+
+            if (collected.Count < complete.Variants.Length)
+            {
+                Assert.Equal(
+                    page.Variants[^1].ProductVariantId,
+                    cursor);
+            }
+            else
+            {
+                Assert.Null(cursor);
+            }
+        }
+
+        Assert.Equal(
+            complete.Variants.Select(variant => variant.ProductVariantId),
+            collected.Select(variant => variant.ProductVariantId));
+
+        Assert.Equivalent(complete.Variants, collected.ToArray(), strict: true);
+    }
+
+    [Theory]
+    [InlineData(
+        StorefrontApiFixture.AzerbaijaniHostName,
+        "Vitrin məhsulu")]
+    [InlineData(
+        StorefrontApiFixture.FallbackHostName,
+        "Storefront product")]
+    public async Task StorefrontLocale_SelectsTranslationOrDefault(
+        string hostName,
+        string expectedName)
+    {
+        using HttpClient client = fixture.CreateClient(hostName);
+
+        ProductPage page = await ReadPageAsync(client, ProductsPath);
+
+        AssertProducts(fixture.StoreA.VisibleProductIds, page);
+        Assert.All(page.Items, item => Assert.Equal(expectedName, item.Name));
+
+        Guid productId = fixture.StoreA.VisibleProductIds[0];
+
+        ProductDetails details = await ReadDetailsAsync(
+            client,
+            $"{ProductsPath}/{productId}");
+
+        Assert.Equal(productId, details.ProductId);
+        Assert.Equal(expectedName, details.Name);
+    }
+
     public sealed record ProductDetails(
         Guid ProductId,
         Guid ProductTypeId,

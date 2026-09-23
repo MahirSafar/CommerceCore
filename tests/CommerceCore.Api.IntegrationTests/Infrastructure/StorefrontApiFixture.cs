@@ -23,6 +23,9 @@ namespace CommerceCore.Api.IntegrationTests.Infrastructure;
 
 public sealed class StorefrontApiFixture : IAsyncLifetime
 {
+    public const string AzerbaijaniHostName = "store-a-az.example.com";
+    public const string FallbackHostName = "store-a-de.example.com";
+
     private readonly PostgreSqlContainer _postgres =
         new PostgreSqlBuilder("postgres:18.6")
             .WithDatabase("commercecore_api_tests")
@@ -63,6 +66,22 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
                 database,
                 "store-a.example.com",
                 cancellationToken);
+
+            database.Storefronts.AddRange(
+                Storefront.Create(
+                    StorefrontId.New(),
+                    TenantId.From(StoreA.TenantId),
+                    AzerbaijaniHostName,
+                    MarketId.From("AZ"),
+                    "az"),
+                Storefront.Create(
+                    StorefrontId.New(),
+                    TenantId.From(StoreA.TenantId),
+                    FallbackHostName,
+                    MarketId.From("AZ"),
+                    "de"));
+
+            await database.SaveChangesAsync(cancellationToken);
 
             StoreB = await SeedStoreAsync(
                 database,
@@ -276,7 +295,10 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
             [
                 new KeyValuePair<LanguageCode, string>(
                     language,
-                    "Storefront product")
+                    "Storefront product"),
+                new KeyValuePair<LanguageCode, string>(
+                    LanguageCode.Create("az"),
+                    "Vitrin məhsulu")
             ]);
 
         Money price = Money.Create(10m, "AZN");
