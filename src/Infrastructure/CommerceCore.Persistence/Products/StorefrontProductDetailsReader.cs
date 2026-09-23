@@ -1,5 +1,6 @@
 using CommerceCore.Application.Catalog.Products.Queries.GetStorefrontProduct;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
+using CommerceCore.Domain.Catalog.Products;
 using CommerceCore.Domain.Catalog.Products.Enums;
 using CommerceCore.Domain.Catalog.Products.ValueObjects;
 using CommerceCore.Domain.Common.ValueObjects.Localization;
@@ -18,6 +19,21 @@ public sealed class StorefrontProductDetailsReader(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfLessThan(
+            query.VariantPageSize,
+            1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            query.VariantPageSize,
+            GetStorefrontProductQuery.MaximumVariantPageSize);
+
+        if (query.AfterVariantId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "The variant cursor cannot be empty.",
+                nameof(query));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!tenantContext.IsResolved ||
             tenantContext.TenantId is not TenantId tenantId ||
@@ -28,6 +44,21 @@ public sealed class StorefrontProductDetailsReader(
         }
 
         ProductId productId = ProductId.From(query.ProductId);
+
+        IQueryable<ProductVariant> candidateVariants = dbContext.Set<ProductVariant>();
+
+        if (query.AfterVariantId is Guid afterVariantId)
+        {
+            // Compare UUIDs in PostgreSQL using the same ordering as ORDER BY.
+            // FromSql parameterizes the cursor.
+            candidateVariants = dbContext.Set<ProductVariant>()
+                .FromSql(
+                    $"""
+                    SELECT *
+                    FROM catalog.product_variants
+                    WHERE id > {afterVariantId}
+                    """);
+        }
 
         var row = await dbContext.Products
             .AsNoTracking()
@@ -44,12 +75,12 @@ public sealed class StorefrontProductDetailsReader(
                 product.Name,
                 BasePriceAmount = product.Price.Amount,
                 product.Price.Currency,
-                Variants = product.Variants
+                Variants = candidateVariants
                     .Where(variant =>
                         variant.TenantId == tenantId &&
+                        EF.Property<ProductId>(variant, "ProductId") == product.Id &&
                         variant.Status == ProductVariantStatus.Active)
-                    .OrderByDescending(variant => variant.IsDefault)
-                    .ThenBy(variant => variant.Id)
+                    .OrderBy(variant => variant.Id)
                     .Select(variant => new
                     {
                         variant.Id,
@@ -59,6 +90,7 @@ public sealed class StorefrontProductDetailsReader(
                         variant.IsDefault,
                         variant.Options
                     })
+                    .Take(query.VariantPageSize + 1)
                     .ToArray()
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -73,6 +105,7 @@ public sealed class StorefrontProductDetailsReader(
             : row.Name.DefaultLanguage;
 
         StorefrontVariantDetails[] variants = row.Variants
+            .Take(query.VariantPageSize)
             .Select(variant => new StorefrontVariantDetails(
                 variant.Id.Value,
                 variant.Sku.Value,
@@ -82,13 +115,18 @@ public sealed class StorefrontProductDetailsReader(
                 MapOptions(variant.Options)))
             .ToArray();
 
+        Guid? nextAfterVariantId = row.Variants.Length > query.VariantPageSize
+            ? variants[^1].ProductVariantId
+            : null;
+
         return new StorefrontProductDetails(
             row.Id.Value,
             row.ProductTypeId.Value,
             row.Name.GetOrDefault(language),
             row.BasePriceAmount,
             row.Currency,
-            variants);
+            variants,
+            nextAfterVariantId);
     }
 
     private static Dictionary<string, string> MapOptions(

@@ -317,13 +317,135 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         Assert.Empty(variant.Options);
     }
 
+    private static async Task<ProductDetails> ReadDetailsAsync(
+        HttpClient client,
+        string path)
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        using HttpResponseMessage response = await client.GetAsync(
+            path,
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore == true);
+
+        ProductDetails? details = await response.Content
+            .ReadFromJsonAsync<ProductDetails>(
+                cancellationToken: cancellationToken);
+
+        Assert.NotNull(details);
+        return details;
+    }
+
+    [Fact]
+    public async Task VariantPagination_DefaultLimit_ReturnsAllActiveVariantsOnce()
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.PaginationStore.HostName);
+
+        Guid productId = fixture.PaginationStore.VisibleProductIds[0];
+        string path = $"{ProductsPath}/{productId}";
+
+        ProductDetails first = await ReadDetailsAsync(client, path);
+        Assert.Equal(20, first.Variants.Length);
+        Assert.Equal(
+            first.Variants[^1].ProductVariantId,
+            first.NextAfterVariantId);
+
+        ProductDetails second = await ReadDetailsAsync(
+            client,
+            $"{path}?afterVariantId={first.NextAfterVariantId}");
+
+        Assert.Equal(5, second.Variants.Length);
+        Assert.Null(second.NextAfterVariantId);
+
+        Guid[] actualIds = first.Variants
+            .Concat(second.Variants)
+            .Select(variant => variant.ProductVariantId)
+            .ToArray();
+
+        Assert.Equal(25, actualIds.Distinct().Count());
+        Assert.Equal(
+            fixture.PaginationStore.FirstProductActiveVariantIds.Order(),
+            actualIds);
+
+        ProductDetails afterLast = await ReadDetailsAsync(
+            client,
+            $"{path}?afterVariantId={actualIds[^1]}");
+
+        Assert.Equal(productId, afterLast.ProductId);
+        Assert.Empty(afterLast.Variants);
+        Assert.Null(afterLast.NextAfterVariantId);
+    }
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(50)]
+    public async Task VariantPagination_FinalPage_DoesNotReturnFalseCursor(
+        int pageSize)
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.PaginationStore.HostName);
+
+        Guid productId = fixture.PaginationStore.VisibleProductIds[0];
+
+        ProductDetails details = await ReadDetailsAsync(
+            client,
+            $"{ProductsPath}/{productId}?variantPageSize={pageSize}");
+
+        Assert.Equal(25, details.Variants.Length);
+        Assert.Null(details.NextAfterVariantId);
+    }
+
+    [Theory]
+    [InlineData("?variantPageSize=0")]
+    [InlineData("?variantPageSize=-1")]
+    [InlineData("?variantPageSize=51")]
+    [InlineData("?variantPageSize=invalid")]
+    [InlineData("?afterVariantId=00000000-0000-0000-0000-000000000000")]
+    [InlineData("?afterVariantId=invalid")]
+    public async Task VariantPagination_InvalidParameters_ReturnBadRequest(
+        string queryString)
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.PaginationStore.HostName);
+
+        Guid productId = fixture.PaginationStore.VisibleProductIds[0];
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{productId}{queryString}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task VariantPagination_CursorDoesNotBypassTenantIsolation()
+    {
+        using HttpClient client = fixture.CreateClient(
+            fixture.StoreA.HostName);
+
+        Guid foreignProductId = fixture.PaginationStore.VisibleProductIds[0];
+        Guid foreignVariantId = fixture.PaginationStore.FirstProductActiveVariantIds[0];
+
+        using HttpResponseMessage response = await client.GetAsync(
+            $"{ProductsPath}/{foreignProductId}" +
+            $"?variantPageSize=1&afterVariantId={foreignVariantId}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     public sealed record ProductDetails(
         Guid ProductId,
         Guid ProductTypeId,
         string Name,
         decimal BasePriceAmount,
         string Currency,
-        VariantDetails[] Variants);
+        VariantDetails[] Variants,
+        Guid? NextAfterVariantId);
 
     public sealed record VariantDetails(
         Guid ProductVariantId,
