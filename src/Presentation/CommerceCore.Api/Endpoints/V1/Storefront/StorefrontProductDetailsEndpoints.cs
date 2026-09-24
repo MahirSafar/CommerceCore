@@ -13,6 +13,8 @@ public static class StorefrontProductDetailsEndpoints
             "/api/storefront/products/{productId:guid}",
             async Task<IResult> (
                 Guid productId,
+                int? variantPageSize,
+                Guid? afterVariantId,
                 HttpContext context,
                 IMediator mediator,
                 CancellationToken cancellationToken) =>
@@ -20,7 +22,10 @@ public static class StorefrontProductDetailsEndpoints
                 context.Response.Headers.CacheControl = "no-store";
 
                 StorefrontProductDetails? result = await mediator.Send(
-                    new GetStorefrontProductQuery(productId),
+                    new GetStorefrontProductQuery(
+                        productId,
+                        VariantPageSize: variantPageSize ?? 20,
+                        AfterVariantId: afterVariantId),
                     cancellationToken);
 
                 if (result is null)
@@ -34,7 +39,8 @@ public static class StorefrontProductDetailsEndpoints
                         variant.Sku,
                         variant.BasePriceAmount,
                         variant.Currency,
-                        variant.IsDefault))
+                        variant.IsDefault,
+                        variant.Options))
                     .ToArray();
 
                 return Results.Ok(new ProductDetailsResponse(
@@ -43,7 +49,8 @@ public static class StorefrontProductDetailsEndpoints
                     result.Name,
                     result.BasePriceAmount,
                     result.Currency,
-                    variants));
+                    variants,
+                    result.NextAfterVariantId));
             })
             .WithName("GetStorefrontProduct")
             .WithTags("Storefront")
@@ -62,12 +69,14 @@ public static class StorefrontProductDetailsEndpoints
         string Name,
         decimal BasePriceAmount,
         string Currency,
-        IReadOnlyList<VariantResponse> Variants);
+        IReadOnlyList<VariantResponse> Variants,
+        Guid? NextAfterVariantId);
 
     public sealed record VariantResponse(
         Guid ProductVariantId,
         string Sku,
         decimal BasePriceAmount,
         string Currency,
-        bool IsDefault);
+        bool IsDefault,
+        IReadOnlyDictionary<string, string> Options);
 }
