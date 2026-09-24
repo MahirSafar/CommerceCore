@@ -138,5 +138,12 @@ public sealed class ProductVariantConfiguration
             .HasFilter("\"is_default\" = TRUE")
             .HasDatabaseName(
                 "ux_product_variants_tenant_default_per_product");
+
+        builder.HasIndex(
+            nameof(ProductVariant.TenantId),
+            "ProductId",
+            nameof(ProductVariant.Id))
+            .HasDatabaseName("ix_product_variants_tenant_product_active_id")
+            .HasFilter("\"status\" = 'Active'");
     }
 }

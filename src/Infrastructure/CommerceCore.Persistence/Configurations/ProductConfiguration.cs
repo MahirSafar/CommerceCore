@@ -26,20 +26,10 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             }
         };
 
-    private sealed record LocalizedTextDocument(string DefaultLanguage, Dictionary<string, string> Translations);
-
-    private static string SerializeLocalizedText(LocalizedText localizedText) =>
-        JsonSerializer.Serialize(new LocalizedTextDocument(localizedText.DefaultLanguage.Value, localizedText.Translations.ToDictionary(pair => pair.Key.Value, pair => pair.Value, StringComparer.Ordinal)));
-
-    private static LocalizedText DeserializeLocalizedText(string json)
-    {
-        var document = JsonSerializer.Deserialize<LocalizedTextDocument>(json, JsonOptions)
-            ?? throw new InvalidOperationException("LocalizedText JSON cannot be null.");
-
-        return LocalizedText.Create(LanguageCode.Create(document.DefaultLanguage), document.Translations.Select(pair => new KeyValuePair<LanguageCode, string>(LanguageCode.Create(pair.Key), pair.Value)));
-    }
-
-    private static readonly ValueConverter<LocalizedText, string> LocalizedTextConverter = new(localizedText => SerializeLocalizedText(localizedText), json => DeserializeLocalizedText(json));
+    private static readonly ValueConverter<LocalizedText, string>
+        LocalizedTextConverter = new(
+            value => LocalizedTextJsonSerializer.Serialize(value),
+            json => LocalizedTextJsonSerializer.Deserialize(json));
 
     private static readonly ValueComparer<LocalizedText> LocalizedTextComparer = new((left, right) => ReferenceEquals(left, right) || left!.Equals(right), value => value.GetHashCode(), value => value);
 

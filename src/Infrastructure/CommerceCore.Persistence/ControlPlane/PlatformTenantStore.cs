@@ -21,16 +21,27 @@ public sealed class PlatformTenantStore : IPlatformTenantStore
             .FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
     }
 
-    public async Task<Storefront?> GetStorefrontByHostAsync(string hostName, CancellationToken cancellationToken = default)
+    public async Task<Storefront?> GetStorefrontByHostAsync(
+        string hostName,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(hostName))
             return null;
 
-        var normalizedHost = hostName.Trim().ToLowerInvariant();
+        string normalizedHost = hostName
+            .Trim()
+            .TrimEnd('.')
+            .ToLowerInvariant();
 
-        return await _dbContext.Set<Storefront>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.HostName == normalizedHost, cancellationToken);
+        return await (
+            from storefront in _dbContext.Set<Storefront>().AsNoTracking()
+            join tenant in _dbContext.Set<Tenant>().AsNoTracking()
+                on storefront.TenantId equals tenant.Id
+            where storefront.HostName == normalizedHost &&
+                  storefront.IsActive &&
+                  tenant.Status == TenantStatuses.Active
+            select storefront)
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     public async Task<TenantMembership?> GetActiveMembershipAsync(
