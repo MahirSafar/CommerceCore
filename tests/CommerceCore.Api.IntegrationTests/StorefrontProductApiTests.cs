@@ -527,6 +527,59 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
         Assert.Equal(expectedName, details.Name);
     }
 
+    [Theory]
+    [InlineData("store-a.example.com", false)]
+    [InlineData("store-a.example.com", true)]
+    [InlineData(StorefrontApiFixture.AzerbaijaniHostName, false)]
+    [InlineData(StorefrontApiFixture.AzerbaijaniHostName, true)]
+    [InlineData(StorefrontApiFixture.FallbackHostName, false)]
+    [InlineData(StorefrontApiFixture.FallbackHostName, true)]
+    public async Task ProductPagination_PreservesFieldsAndLocale(
+        string hostName,
+        bool filterByProductType)
+    {
+        using HttpClient client = fixture.CreateClient(hostName);
+
+        string typeFilter = filterByProductType
+            ? $"&productTypeId={fixture.StoreA.ProductTypeId}"
+            : string.Empty;
+
+        ProductPage complete = await ReadPageAsync(
+            client,
+            $"{ProductsPath}?pageSize=100{typeFilter}");
+
+        AssertProducts(fixture.StoreA.VisibleProductIds, complete);
+        Assert.Equal(2, complete.Items.Length);
+
+        ProductPage first = await ReadPageAsync(
+            client,
+            $"{ProductsPath}?pageSize=1{typeFilter}");
+
+        ProductItem firstItem = Assert.Single(first.Items);
+        Assert.Equal(firstItem.ProductId, first.NextAfterProductId);
+
+        ProductPage second = await ReadPageAsync(
+            client,
+            $"{ProductsPath}?pageSize=1{typeFilter}" +
+            $"&afterProductId={first.NextAfterProductId}");
+
+        ProductItem secondItem = Assert.Single(second.Items);
+        Assert.Null(second.NextAfterProductId);
+
+        // Record equality checks ID, type, localized name, price and currency.
+        Assert.Equal(
+            complete.Items,
+            new[] { firstItem, secondItem });
+
+        ProductPage afterLast = await ReadPageAsync(
+            client,
+            $"{ProductsPath}?pageSize=1{typeFilter}" +
+            $"&afterProductId={secondItem.ProductId}");
+
+        Assert.Empty(afterLast.Items);
+        Assert.Null(afterLast.NextAfterProductId);
+    }
+
     public sealed record ProductDetails(
         Guid ProductId,
         Guid ProductTypeId,

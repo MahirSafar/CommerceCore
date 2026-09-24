@@ -38,12 +38,12 @@ public sealed class StorefrontProductReader(
 
         if (query.AfterProductId is Guid afterProductId)
         {
-            // Keep UUID comparison in PostgreSQL, using the same ordering
-            // as the ORDER BY below. The cursor is passed as a SQL parameter.
-            products = dbContext.Products.FromSql(
-                $"""
-                SELECT * FROM catalog.products WHERE id > {afterProductId}
-                """);
+            ProductId cursor = ProductId.From(afterProductId);
+
+            // Compare UUIDs in PostgreSQL using the same ordering as ORDER BY.
+            products = products.Where(product => EF.Functions.GreaterThan(
+                ValueTuple.Create(product.Id),
+                ValueTuple.Create(cursor)));
         }
 
         products = products
