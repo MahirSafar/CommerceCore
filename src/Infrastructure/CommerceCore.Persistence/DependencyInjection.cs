@@ -16,6 +16,7 @@ public static class DependencyInjection
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
+        services.AddScoped<ProductAggregateConcurrencyInterceptor>();
         services.AddScoped<AuditingSaveChangesInterceptor>();
         services.AddScoped<OutboxSaveChangesInterceptor>();
         services.AddScoped<TenantSessionInterceptor>();
@@ -53,6 +54,9 @@ public static class DependencyInjection
                             errorCodesToAdd: null);
                     });
 
+                ProductAggregateConcurrencyInterceptor aggregateConcurrencyInterceptor =
+                    serviceProvider.GetRequiredService<ProductAggregateConcurrencyInterceptor>();
+
                 AuditingSaveChangesInterceptor auditingInterceptor =
                     serviceProvider.GetRequiredService<AuditingSaveChangesInterceptor>();
 
@@ -63,6 +67,7 @@ public static class DependencyInjection
                     serviceProvider.GetRequiredService<TenantSessionInterceptor>();
 
                 options.AddInterceptors(
+                    aggregateConcurrencyInterceptor,
                     auditingInterceptor,
                     outboxInterceptor,
                     tenantSessionInterceptor);
