@@ -117,12 +117,6 @@ public sealed class ProductTypeConfiguration : IEntityTypeConfiguration<ProductT
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_product_types_parent_product_type");
 
-        builder.HasMany(productType => productType.AttributeDefinitions)
-            .WithOne()
-            .HasForeignKey(definition => definition.ProductTypeId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .HasConstraintName("fk_attribute_definitions_product_type");
-
         builder.Navigation(productType => productType.AttributeDefinitions)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
