@@ -377,6 +377,155 @@ public sealed class ProductConcurrencyIntegrationTests(
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SaveChanges_WhenDefaultSwitchRacesWithTargetDeactivation_PreservesInvariant(
+        bool defaultSwitchCommitsFirst)
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var tenantContext = fixture.Services
+            .GetRequiredService<TestTenantContext>();
+
+        TenantId? previousTenant = tenantContext.TenantId;
+
+        try
+        {
+            TenantId tenantId = await fixture.CreateTenantAsync(cancellationToken);
+            tenantContext.SetTenant(tenantId);
+
+            ProductId productId = await SeedProductWithActiveDefaultVariantAsync(
+                tenantId,
+                cancellationToken);
+
+            ProductVariantId originalDefaultId;
+            ProductVariantId targetVariantId;
+
+            await using (var seedScope = fixture.Services.CreateAsyncScope())
+            {
+                var seedDb = seedScope.ServiceProvider
+                    .GetRequiredService<CommerceCoreDbContext>();
+
+                Product product = await seedDb.Products
+                    .Include(item => item.Variants)
+                    .SingleAsync(item => item.Id == productId, cancellationToken);
+
+                originalDefaultId = Assert.Single(product.Variants).Id;
+
+                ProductVariant target = product.AddVariant(
+                    VariantSku.Create($"default_race_{Guid.NewGuid():N}"),
+                    Money.Create(99.99m, "USD"),
+                    AttributeValueBag.Empty.With(
+                        AttributeKey.Create("color"),
+                        AttributeValue.SingleSelect.Create("blue")),
+                    isDefault: false);
+
+                targetVariantId = target.Id;
+
+                Assert.True(product.ActivateVariant(targetVariantId));
+                Assert.True(product.Activate());
+
+                await seedDb.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var switchScope = fixture.Services.CreateAsyncScope();
+            await using var deactivateScope = fixture.Services.CreateAsyncScope();
+
+            var switchDb = switchScope.ServiceProvider
+                .GetRequiredService<CommerceCoreDbContext>();
+
+            var deactivateDb = deactivateScope.ServiceProvider
+                .GetRequiredService<CommerceCoreDbContext>();
+
+            await switchDb.Database.OpenConnectionAsync(cancellationToken);
+            await deactivateDb.Database.OpenConnectionAsync(cancellationToken);
+
+            Product switchProduct = await switchDb.Products
+                .Include(item => item.Variants)
+                .SingleAsync(item => item.Id == productId, cancellationToken);
+
+            Product deactivateProduct = await deactivateDb.Products
+                .Include(item => item.Variants)
+                .SingleAsync(item => item.Id == productId, cancellationToken);
+
+            Assert.Equal(ProductStatus.Active, switchProduct.Status);
+            Assert.Equal(ProductStatus.Active, deactivateProduct.Status);
+
+            Assert.Equal(
+                originalDefaultId,
+                Assert.Single(
+                    switchProduct.Variants,
+                    variant => variant.IsDefault).Id);
+
+            Assert.Equal(
+                originalDefaultId,
+                Assert.Single(
+                    deactivateProduct.Variants,
+                    variant => variant.IsDefault).Id);
+
+            Assert.True(switchProduct.SetDefaultVariant(targetVariantId));
+            Assert.True(deactivateProduct.DeactivateVariant(targetVariantId));
+
+            CommerceCoreDbContext firstWriter = defaultSwitchCommitsFirst
+                ? switchDb
+                : deactivateDb;
+
+            CommerceCoreDbContext secondWriter = defaultSwitchCommitsFirst
+                ? deactivateDb
+                : switchDb;
+
+            await firstWriter.SaveChangesAsync(cancellationToken);
+
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+                () => secondWriter.SaveChangesAsync(cancellationToken));
+
+            await using var verificationScope = fixture.Services.CreateAsyncScope();
+
+            var verificationDb = verificationScope.ServiceProvider
+                .GetRequiredService<CommerceCoreDbContext>();
+
+            Product persisted = await verificationDb.Products
+                .AsNoTracking()
+                .Include(item => item.Variants)
+                .SingleAsync(item => item.Id == productId, cancellationToken);
+
+            Assert.Equal(ProductStatus.Active, persisted.Status);
+            Assert.Equal(2, persisted.Variants.Count);
+
+            ProductVariant persistedDefault = Assert.Single(
+                persisted.Variants,
+                variant => variant.IsDefault);
+
+            Assert.Equal(ProductVariantStatus.Active, persistedDefault.Status);
+
+            Assert.Equal(
+                defaultSwitchCommitsFirst ? targetVariantId : originalDefaultId,
+                persistedDefault.Id);
+
+            ProductVariant persistedTarget = Assert.Single(
+                persisted.Variants,
+                variant => variant.Id == targetVariantId);
+
+            Assert.Equal(
+                defaultSwitchCommitsFirst
+                    ? ProductVariantStatus.Active
+                    : ProductVariantStatus.Inactive,
+                persistedTarget.Status);
+
+            ProductVariant persistedOriginal = Assert.Single(
+                persisted.Variants,
+                variant => variant.Id == originalDefaultId);
+
+            Assert.Equal(ProductVariantStatus.Active, persistedOriginal.Status);
+        }
+        finally
+        {
+            tenantContext.SetTenant(previousTenant);
+        }
+    }
+
     private async Task<ProductId> SeedProductWithActiveDefaultVariantAsync(
         TenantId tenantId,
         CancellationToken cancellationToken)
