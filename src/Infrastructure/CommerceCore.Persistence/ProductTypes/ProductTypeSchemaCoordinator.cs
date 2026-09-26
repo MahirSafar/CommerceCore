@@ -103,25 +103,71 @@ internal sealed class ProductTypeSchemaCoordinator(CommerceCoreDbContext dbConte
         Func<IDbContextTransaction, Task> action,
         CancellationToken cancellationToken)
     {
-        IExecutionStrategy executionStrategy =
-            _dbContext.Database.CreateExecutionStrategy();
-
-        await executionStrategy.ExecuteAsync(async () =>
+        if (_dbContext.ChangeTracker.HasChanges())
         {
-            await using IDbContextTransaction transaction = await _dbContext.Database
-                .BeginTransactionAsync(cancellationToken);
+            throw new InvalidOperationException(
+                "Schema operations must start without pending tracked changes. " +
+                "Apply changes inside the persistence callback.");
+        }
 
-            try
+        IExecutionStrategy executionStrategy = _dbContext.Database.CreateExecutionStrategy();
+        bool retryAllowed = true;
+
+        await executionStrategy.ExecuteAsync(
+            async _ =>
             {
-                await action(transaction);
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
-        });
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!retryAllowed)
+                {
+                    throw new InvalidOperationException(
+                        "The previous schema transaction did not finish with " +
+                        "a confirmed rollback. Automatic replay is not allowed.");
+                }
+
+                await using IDbContextTransaction transaction = await _dbContext.Database.BeginTransactionAsync(
+                    cancellationToken);
+
+                retryAllowed = false;
+                bool commitAttempted = false;
+
+                try
+                {
+                    await action(transaction);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    commitAttempted = true;
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch (Exception operationException)
+                {
+                    if (commitAttempted)
+                    {
+                        throw new InvalidOperationException(
+                            "Schema transaction commit failed. Its outcome must " +
+                            "be verified before the operation can be repeated.",
+                            operationException);
+                    }
+
+                    try
+                    {
+                        await transaction.RollbackAsync(CancellationToken.None);
+                    }
+                    catch (Exception rollbackException)
+                    {
+                        throw new AggregateException(
+                            "Schema transaction rollback could not be confirmed. " +
+                            "Automatic replay is not allowed.",
+                            operationException,
+                            rollbackException);
+                    }
+
+                    _dbContext.ChangeTracker.Clear();
+                    retryAllowed = true;
+                    throw;
+                }
+            },
+            cancellationToken);
     }
 
     private async Task<Guid> GetTreeRootIdAsync(
