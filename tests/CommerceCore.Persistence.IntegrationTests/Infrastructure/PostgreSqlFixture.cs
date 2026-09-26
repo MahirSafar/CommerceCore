@@ -127,6 +127,31 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ExecuteTestAdminSqlAsync(
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+
+        await using var connection = new NpgsqlConnection(
+            _postgres.GetConnectionString());
+
+        await connection.OpenAsync(cancellationToken);
+
+        if (connection.Database != "commercecore_integration")
+        {
+            throw new InvalidOperationException(
+                "Test administration requires commercecore_integration.");
+        }
+
+        await using var command = new NpgsqlCommand(sql, connection)
+        {
+            CommandTimeout = 15
+        };
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async ValueTask InitializeAsync()
     {
         await _postgres.StartAsync();
