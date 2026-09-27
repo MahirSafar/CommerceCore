@@ -6,6 +6,10 @@ namespace CommerceCore.Platform.ControlPlane;
 public interface IPlatformTenantStore
 {
     Task<Tenant?> GetTenantByIdAsync(TenantId tenantId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns an active storefront belonging to an active tenant,
+    /// or null when no eligible storefront exists.
+    /// </summary>
     Task<Storefront?> GetStorefrontByHostAsync(string hostName, CancellationToken cancellationToken = default);
     Task<TenantMembership?> GetActiveMembershipAsync(
         TenantId tenantId,

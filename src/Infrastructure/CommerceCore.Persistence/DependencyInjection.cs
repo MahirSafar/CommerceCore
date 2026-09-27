@@ -25,6 +25,9 @@ public static class DependencyInjection
         services.AddScoped<IAttributeDefinitionRegistry, AttributeDefinitionRegistry>();
         services.AddScoped<IPlatformTenantStore, PlatformTenantStore>();
         services.AddScoped<IStorefrontProductReader, StorefrontProductReader>();
+        services.AddScoped<
+            IStorefrontProductDetailsReader,
+            StorefrontProductDetailsReader>();
 
         services.AddDbContext<PlatformReadDbContext>(options =>
         {

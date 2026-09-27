@@ -3,6 +3,7 @@ using CommerceCore.Platform.Contracts;
 using CommerceCore.Platform.ControlPlane;
 using CommerceCore.Platform.ControlPlane.Entities;
 using CommerceCore.Platform.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using NSubstitute;
 
@@ -438,6 +439,78 @@ public sealed class TenantResolutionMiddlewareTests
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
 
+        await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
+            Arg.Any<TenantId>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Membership_DoesNotSkip_ForAllowAnonymousAlone()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/storefront/products";
+        context.Request.Method = HttpMethods.Get;
+        context.SetEndpoint(new Endpoint(
+            _ => Task.CompletedTask,
+            new EndpointMetadataCollection(new AllowAnonymousAttribute()),
+            "anonymous-without-storefront-metadata"));
+
+        bool nextCalled = false;
+        var middleware = new TenantMembershipMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await middleware.InvokeAsync(
+            context,
+            _tenantStore,
+            TenantContext.ForTenant(TenantId.New()));
+
+        Assert.False(nextCalled);
+        Assert.Equal(
+            StatusCodes.Status401Unauthorized,
+            context.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("POST", true)]
+    [InlineData("DELETE", true)]
+    [InlineData("GET", false)]
+    public async Task Membership_Rejects_InvalidPublicMetadata(
+        string method,
+        bool allowAnonymous)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/storefront/products";
+        context.Request.Method = method;
+
+        var metadata = new List<object> { PublicStorefrontReadMetadata.Instance };
+        if (allowAnonymous)
+        {
+            metadata.Add(new AllowAnonymousAttribute());
+        }
+
+        context.SetEndpoint(new Endpoint(
+            _ => Task.CompletedTask,
+            new EndpointMetadataCollection(metadata),
+            "invalid-public-endpoint"));
+
+        bool nextCalled = false;
+        var middleware = new TenantMembershipMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            middleware.InvokeAsync(
+                context,
+                _tenantStore,
+                TenantContext.ForTenant(TenantId.New())));
+
+        Assert.False(nextCalled);
         await _tenantStore.DidNotReceive().GetActiveMembershipAsync(
             Arg.Any<TenantId>(),
             Arg.Any<string>(),

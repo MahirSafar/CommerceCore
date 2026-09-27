@@ -34,7 +34,7 @@ public sealed class ProductVariant : BaseEntity<ProductVariantId>
 
         TenantId = tenantId;
         Sku = sku;
-        Price = price;
+        Price = price with { };
         Options = options;
         IsDefault = isDefault;
         Status = ProductVariantStatus.Draft;
@@ -104,7 +104,7 @@ public sealed class ProductVariant : BaseEntity<ProductVariantId>
         if (Price == newPrice)
             return false;
 
-        Price = newPrice;
+        Price = newPrice with { };
         return true;
     }
 

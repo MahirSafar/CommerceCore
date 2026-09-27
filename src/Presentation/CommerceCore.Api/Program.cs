@@ -3,6 +3,7 @@ using CommerceCore.Api.Common.Security;
 using CommerceCore.Api.Configuration;
 using CommerceCore.Api.Endpoints.V1.Products;
 using CommerceCore.Api.Endpoints.V1.ProductTypes;
+using CommerceCore.Api.Endpoints.V1.Storefront;
 using CommerceCore.Api.Identity;
 using CommerceCore.Application;
 using CommerceCore.Application.Catalog;
@@ -59,6 +60,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
 
 app.UseAuthentication();
 app.UseRateLimiter();
@@ -68,6 +70,8 @@ app.UseAuthorization();
 app.MapHealthCheckEndpoints();
 app.MapProductEndpoints();
 app.MapProductTypeEndpoints();
+app.MapStorefrontProductEndpoints();
+app.MapStorefrontProductDetailsEndpoints();
 
 app.Run();
 
