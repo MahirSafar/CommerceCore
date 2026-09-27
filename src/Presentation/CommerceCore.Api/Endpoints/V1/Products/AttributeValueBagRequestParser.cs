@@ -1,4 +1,4 @@
-﻿using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
+using CommerceCore.Application.Catalog.Products.Commands.SetProductSpecifications;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using FluentValidation;
@@ -11,8 +11,6 @@ public static class AttributeValueBagRequestParser
 {
     public static ProductSpecificationsInput Parse(JsonElement specifications)
     {
-        List<ValidationFailure> failures = [];
-
         if (specifications.ValueKind != JsonValueKind.Object)
         {
             throw CreateException(
@@ -21,20 +19,20 @@ public static class AttributeValueBagRequestParser
                 "Specifications must be a JSON object.");
         }
 
-        JsonProperty[] properties = [.. specifications.EnumerateObject()];
-
-        if (properties.Length > 50)
+        if (AttributeRequestLimits.HasTooManyAttributes(specifications))
         {
-            failures.Add(CreateFailure(
+            throw CreateException(
                 "specifications",
                 "specifications.too_many_attributes",
-                "A product can contain at most 50 specification attributes."));
+                "A product can contain at most 50 specification attributes.");
         }
+
+        List<ValidationFailure> failures = [];
 
         Dictionary<AttributeKey, ProductSpecificationInputValue> result = [];
         HashSet<AttributeKey> keys = [];
 
-        foreach (JsonProperty property in properties)
+        foreach (JsonProperty property in specifications.EnumerateObject())
         {
             string propertyPath = $"specifications.{property.Name}";
 

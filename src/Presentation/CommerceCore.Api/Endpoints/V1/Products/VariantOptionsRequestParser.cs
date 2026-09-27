@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using CommerceCore.Domain.Catalog.Attributes.ValueObjects;
 using CommerceCore.Domain.Catalog.ProductTypes.ValueObjects;
 using FluentValidation;
@@ -18,21 +18,20 @@ public static class VariantOptionsRequestParser
                 "Variant options must be a JSON object.");
         }
 
-        JsonProperty[] properties = [.. options.EnumerateObject()];
-        List<ValidationFailure> failures = [];
-
-        if (properties.Length > 50)
+        if (AttributeRequestLimits.HasTooManyAttributes(options))
         {
-            failures.Add(CreateFailure(
+            throw CreateException(
                 "options",
                 "options.too_many_attributes",
-                "A variant can contain at most 50 option attributes."));
+                "A variant can contain at most 50 option attributes.");
         }
+
+        List<ValidationFailure> failures = [];
 
         AttributeValueBag result = AttributeValueBag.Empty;
         HashSet<AttributeKey> keys = [];
 
-        foreach (JsonProperty property in properties)
+        foreach (JsonProperty property in options.EnumerateObject())
         {
             string propertyPath = $"options.{property.Name}";
 
