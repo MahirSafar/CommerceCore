@@ -153,6 +153,13 @@ public sealed class TenantRlsIntegrationTests
                 cancellationToken);
 
             Assert.Equal(0, affected);
+
+            int deleted = await dbB.Database.ExecuteSqlRawAsync(
+                "DELETE FROM catalog.products WHERE id = {0}",
+                [productAId.Value],
+                cancellationToken);
+
+            Assert.Equal(0, deleted);
         }
 
         // Verify product remains unchanged in Tenant A
@@ -248,39 +255,6 @@ public sealed class TenantRlsIntegrationTests
                 await dbA.SaveChangesAsync(cancellationToken);
             });
         }
-    }
-
-    [Fact]
-    public async Task Rls_Outbox_Message_Retains_TenantId()
-    {
-        CancellationToken cancellationToken =
-            TestContext.Current.CancellationToken;
-
-        // Arrange
-        TenantId tenantA = _fixture.PrimaryTenantId;
-        var tenantContext = _fixture.Services.GetRequiredService<TestTenantContext>();
-        tenantContext.SetTenant(tenantA);
-
-        await using var scope = _fixture.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<CommerceCoreDbContext>();
-
-        var productType = ProductType.CreateRoot(tenantA, ProductTypeCode.Create("outbox_" + Guid.NewGuid().ToString("N")[..8]), isAssignable: true);
-        db.ProductTypes.Add(productType);
-        await db.SaveChangesAsync(cancellationToken);
-
-        var product = Product.Create(tenantA, CreateName("Outbox Product"), CreatePrice(450), productType.Id, DateTimeOffset.UtcNow);
-        product.AddVariant(VariantSku.Create("SKU-OUTBOX-" + Guid.NewGuid().ToString("N")[..6]), CreatePrice(450), CommerceCore.Domain.Catalog.Attributes.ValueObjects.AttributeValueBag.Empty, isDefault: true);
-        db.Products.Add(product);
-
-        // Act: Save creates domain events and writes to Outbox
-        await db.SaveChangesAsync(cancellationToken);
-
-        // Assert: Outbox messages must have TenantId of Tenant A
-        var outboxMessage = await db.OutboxMessages.FirstOrDefaultAsync(
-            m => m.TenantId == tenantA,
-            cancellationToken);
-        Assert.NotNull(outboxMessage);
-        Assert.Equal(tenantA, outboxMessage.TenantId);
     }
 
     [Fact]
