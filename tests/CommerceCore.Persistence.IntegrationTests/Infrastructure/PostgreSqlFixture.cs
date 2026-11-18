@@ -26,6 +26,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
     public IServiceProvider Services { get; private set; } = null!;
 
+    public string ApplicationConnectionString { get; private set; } = null!;
+
     public TenantId SetTenantForCurrentTest()
     {
         TenantId tenantId = PrimaryTenantId;
@@ -187,7 +189,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             await command.ExecuteNonQueryAsync();
         }
 
-        var applicationConnectionString =
+        ApplicationConnectionString =
             new NpgsqlConnectionStringBuilder(adminConnectionString)
             {
                 Username = "commercecore_app",
@@ -201,7 +203,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         services.AddSingleton<TestTenantContext>();
         services.AddSingleton<ITenantContext>(sp => sp.GetRequiredService<TestTenantContext>());
 
-        services.AddPersistence(applicationConnectionString);
+        services.AddPersistence(ApplicationConnectionString);
 
         services.AddCatalogApplication();
 
