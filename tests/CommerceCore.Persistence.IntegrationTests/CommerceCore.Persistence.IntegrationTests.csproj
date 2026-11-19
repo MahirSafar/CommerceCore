@@ -25,6 +25,9 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="../../docker/postgres/init/00-provision-app-role.sql"
+          Link="00-provision-app-role.sql"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
