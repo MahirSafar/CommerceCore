@@ -110,9 +110,14 @@ public sealed class StorefrontProductReaderTests(PostgreSqlFixture fixture)
     {
         fixture.Services.GetRequiredService<TestTenantContext>().Clear();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => ReadAsync(
-            new ListStorefrontProductsQuery(),
-            TestContext.Current.CancellationToken));
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ReadAsync(
+                new ListStorefrontProductsQuery(),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "A resolved tenant is required to read storefront products.",
+            exception.Message);
     }
 
     [Theory]

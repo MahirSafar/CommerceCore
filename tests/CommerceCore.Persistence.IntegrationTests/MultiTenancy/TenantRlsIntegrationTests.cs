@@ -249,11 +249,13 @@ public sealed class TenantRlsIntegrationTests
             productA.AddVariant(VariantSku.Create("SKU-CROSS-" + Guid.NewGuid().ToString("N")[..6]), CreatePrice(300), CommerceCore.Domain.Catalog.Attributes.ValueObjects.AttributeValueBag.Empty, isDefault: true);
             dbA.Products.Add(productA);
 
-            // Assert: Should fail DB composite Foreign Key constraint
-            await Assert.ThrowsAnyAsync<DbUpdateException>(async () =>
-            {
-                await dbA.SaveChangesAsync(cancellationToken);
-            });
+            // Assert: the composite foreign key rejects the other tenant's product type.
+            DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(
+                () => dbA.SaveChangesAsync(cancellationToken));
+
+            PostgresException postgres = Assert.IsType<PostgresException>(exception.InnerException);
+            Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, postgres.SqlState);
+            Assert.Equal("fk_products_product_type", postgres.ConstraintName);
         }
     }
 
@@ -383,8 +385,15 @@ public sealed class TenantRlsIntegrationTests
 
             dbA.ProductTypes.Add(illegalChild);
 
-            await Assert.ThrowsAnyAsync<DbUpdateException>(
+            DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(
                 () => dbA.SaveChangesAsync(cancellationToken));
+
+            // The path trigger looks the parent up within the row's own tenant and rejects
+            // the row before any foreign key is checked.
+            PostgresException postgres = Assert.IsType<PostgresException>(exception.InnerException);
+            Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, postgres.SqlState);
+            Assert.Null(postgres.ConstraintName);
+            Assert.Contains("catalog.trg_fn_product_type_path()", postgres.Where, StringComparison.Ordinal);
         }
     }
 
