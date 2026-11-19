@@ -10,6 +10,7 @@ using CommerceCore.Persistence.IntegrationTests.Infrastructure;
 using CommerceCore.Platform.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace CommerceCore.Persistence.IntegrationTests.Products;
 
@@ -91,7 +92,7 @@ public sealed class ProductVariantPersistenceIntegrationTests(
     }
 
     [Fact]
-    public async Task SaveChanges_WithDuplicateGlobalSku_ThrowsDbUpdateException()
+    public async Task SaveChanges_WithDuplicateSkuInSameTenant_ThrowsUniqueViolationOnTenantSkuIndex()
     {
         CancellationToken cancellationToken =
             TestContext.Current.CancellationToken;
@@ -115,7 +116,7 @@ public sealed class ProductVariantPersistenceIntegrationTests(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         VariantSku sharedSku = VariantSku.Create(
-            $"global-sku-{Guid.NewGuid():N}");
+            $"tenant-sku-{Guid.NewGuid():N}");
 
         Product firstProduct = CreateProduct(tenantId, productType.Id);
         firstProduct.AddVariant(
@@ -133,8 +134,65 @@ public sealed class ProductVariantPersistenceIntegrationTests(
 
         dbContext.Products.AddRange(firstProduct, secondProduct);
 
-        await Assert.ThrowsAsync<DbUpdateException>(
+        DbUpdateException exception = await Assert.ThrowsAsync<DbUpdateException>(
             () => dbContext.SaveChangesAsync(cancellationToken));
+
+        PostgresException postgres = Assert.IsType<PostgresException>(exception.InnerException);
+        Assert.Equal(PostgresErrorCodes.UniqueViolation, postgres.SqlState);
+        Assert.Equal("ux_product_variants_tenant_sku", postgres.ConstraintName);
+    }
+
+    [Fact]
+    public async Task SaveChanges_WithSameSkuInDifferentTenants_Succeeds()
+    {
+        CancellationToken cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        VariantSku sharedSku = VariantSku.Create(
+            $"shared-sku-{Guid.NewGuid():N}");
+
+        TenantId firstTenant = await fixture.CreateTenantAsync(cancellationToken);
+        TenantId secondTenant = await fixture.CreateTenantAsync(cancellationToken);
+
+        await SaveProductWithSkuAsync(firstTenant, sharedSku, cancellationToken);
+
+        // The unique index leads with the tenant id, so another tenant may reuse the SKU.
+        Exception? exception = await Record.ExceptionAsync(
+            () => SaveProductWithSkuAsync(secondTenant, sharedSku, cancellationToken));
+
+        Assert.Null(exception);
+    }
+
+    private async Task SaveProductWithSkuAsync(
+        TenantId tenantId,
+        VariantSku sku,
+        CancellationToken cancellationToken)
+    {
+        fixture.Services.GetRequiredService<TestTenantContext>().SetTenant(tenantId);
+
+        await using AsyncServiceScope scope =
+            fixture.Services.CreateAsyncScope();
+
+        CommerceCoreDbContext dbContext = scope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>();
+
+        var productType = ProductType.CreateRoot(
+            tenantId,
+            ProductTypeCode.Create($"type_{Guid.NewGuid():N}"[..12]),
+            isAssignable: true);
+
+        dbContext.ProductTypes.Add(productType);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        Product product = CreateProduct(tenantId, productType.Id);
+        product.AddVariant(
+            sku,
+            Money.Create(100m, "USD"),
+            AttributeValueBag.Empty,
+            isDefault: true);
+
+        dbContext.Products.Add(product);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static Product CreateProduct(TenantId tenantId, ProductTypeId productTypeId)
