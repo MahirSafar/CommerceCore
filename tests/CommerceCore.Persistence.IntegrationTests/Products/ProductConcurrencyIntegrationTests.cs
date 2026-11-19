@@ -16,7 +16,7 @@ public sealed class ProductConcurrencyIntegrationTests(
     PostgreSqlFixture fixture)
 {
     [Fact]
-    public async Task SaveChanges_WhenProductWasChangedConcurrently_ThrowsConcurrencyException()
+    public async Task SaveChanges_WhenProductWasChangedConcurrently_ThrowsAndKeepsFirstWrite()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
 
@@ -51,6 +51,19 @@ public sealed class ProductConcurrencyIntegrationTests(
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
             () => dbContext2.SaveChangesAsync(cancellationToken));
+
+        // The first write is the one that persisted.
+        await using var verificationScope = fixture.Services.CreateAsyncScope();
+
+        Product persisted = await verificationScope.ServiceProvider
+            .GetRequiredService<CommerceCoreDbContext>()
+            .Products
+            .AsNoTracking()
+            .SingleAsync(
+                item => item.Id == ProductId.From(productId),
+                cancellationToken);
+
+        Assert.Equal(120m, persisted.Price.Amount);
     }
 
     private async Task<Guid> SeedProductAsync(
