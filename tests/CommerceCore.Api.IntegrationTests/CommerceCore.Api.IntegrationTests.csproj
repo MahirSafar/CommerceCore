@@ -21,6 +21,9 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Include="../../docker/postgres/init/00-provision-app-role.sql"
+          Link="00-provision-app-role.sql"
+          CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\..\src\Presentation\CommerceCore.Api\CommerceCore.Api.csproj" />
   </ItemGroup>
 

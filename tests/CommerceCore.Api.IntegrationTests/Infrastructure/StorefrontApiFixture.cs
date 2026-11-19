@@ -51,6 +51,15 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
 
         string adminConnectionString = _postgres.GetConnectionString();
 
+        string runtimePassword = Guid.NewGuid().ToString("N");
+
+        // The order of the Compose database: the role script runs on the empty
+        // database, so the migrated tables get their grants from default privileges.
+        await ProvisionRuntimeRoleAsync(
+            adminConnectionString,
+            runtimePassword,
+            cancellationToken);
+
         var options = new DbContextOptionsBuilder<CommerceCoreDbContext>()
             .UseNpgsql(adminConnectionString)
             .AddInterceptors(new AuditingSaveChangesInterceptor(
@@ -95,46 +104,10 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
                 additionalActiveVariants: 24);
         }
 
-        string runtimePassword = Guid.NewGuid().ToString("N");
-
-        await using (var connection = new NpgsqlConnection(
-            adminConnectionString))
-        {
-            await connection.OpenAsync(cancellationToken);
-
-            // Only a generated hexadecimal password is interpolated.
-            string sql = $"""
-                CREATE ROLE commercecore_api_test
-                    LOGIN PASSWORD '{runtimePassword}'
-                    NOSUPERUSER NOCREATEDB NOCREATEROLE
-                    NOINHERIT NOBYPASSRLS;
-
-                GRANT CONNECT ON DATABASE commercecore_api_tests
-                    TO commercecore_api_test;
-
-                GRANT USAGE ON SCHEMA catalog, outbox, platform
-                    TO commercecore_api_test;
-
-                GRANT SELECT, INSERT, UPDATE, DELETE
-                    ON ALL TABLES IN SCHEMA catalog, outbox
-                    TO commercecore_api_test;
-
-                GRANT SELECT ON ALL TABLES IN SCHEMA platform
-                    TO commercecore_api_test;
-
-                GRANT USAGE, SELECT
-                    ON ALL SEQUENCES IN SCHEMA catalog, outbox
-                    TO commercecore_api_test;
-                """;
-
-            await using var command = new NpgsqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-
         RuntimeConnectionString = new NpgsqlConnectionStringBuilder(
             adminConnectionString)
         {
-            Username = "commercecore_api_test",
+            Username = "commercecore_app",
             Password = runtimePassword,
             MaxPoolSize = 1
         }.ConnectionString;
@@ -167,6 +140,31 @@ public sealed class StorefrontApiFixture : IAsyncLifetime
         {
             await _postgres.DisposeAsync();
         }
+    }
+
+    private static async Task ProvisionRuntimeRoleAsync(
+        string adminConnectionString,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        string script = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "00-provision-app-role.sql"),
+            cancellationToken);
+
+        await using var connection = new NpgsqlConnection(adminConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using (var provision = new NpgsqlCommand(script, connection))
+        {
+            await provision.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Only a generated hexadecimal password is interpolated.
+        await using var setPassword = new NpgsqlCommand(
+            $"ALTER ROLE commercecore_app PASSWORD '{password}'",
+            connection);
+
+        await setPassword.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<StoreData> SeedStoreAsync(
