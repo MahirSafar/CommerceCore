@@ -192,6 +192,7 @@ CommerceCore establishes a strict separation of database privileges between runt
    - `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`
    - **`platform` Schema**: Read-only (`SELECT` only). The application cannot create, update, or delete tenants, storefronts, or memberships at runtime.
    - **`catalog` and `outbox` Schemas**: `SELECT, INSERT, UPDATE, DELETE` with RLS strictly enforced on every query.
+   - **Provisioning**: `docker/postgres/init/00-provision-app-role.sql` creates the role and its grants on the first start of the Compose database, and `01-set-app-role-password.sh` sets its password from `COMMERCECORE_APP_PASSWORD`. The script is repeatable and keeps an existing password: run it as the migration administrator after migrating wherever the init scripts did not run or another administrator created the tables. The integration tests provision their databases with the same script.
 2. **Migration Role Separation**:
    - `CommerceCoreDbContextFactory` reads `COMMERCECORE_MIGRATIONS_CONNECTION_STRING` for design-time migrations and DDL execution.
    - Prevents web application connection strings from possessing schema alteration (DDL) privileges in production.

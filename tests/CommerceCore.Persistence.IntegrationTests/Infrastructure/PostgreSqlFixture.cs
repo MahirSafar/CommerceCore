@@ -12,6 +12,8 @@ namespace CommerceCore.Persistence.IntegrationTests.Infrastructure;
 
 public sealed class PostgreSqlFixture : IAsyncLifetime
 {
+    private const string AppRolePassword = "TestAppPassword123!";
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18.6")
         .WithDatabase("commercecore_integration")
         .WithUsername("postgres")
@@ -27,6 +29,25 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     public IServiceProvider Services { get; private set; } = null!;
 
     public string ApplicationConnectionString { get; private set; } = null!;
+
+    public string AdminConnectionString => _postgres.GetConnectionString();
+
+    // Runs the script the Compose database runs on first start, so that tests
+    // connect with the privileges a real deployment gets.
+    public static async Task ProvisionAppRoleAsync(
+        string adminConnectionString,
+        CancellationToken cancellationToken)
+    {
+        string script = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "00-provision-app-role.sql"),
+            cancellationToken);
+
+        await using var connection = new NpgsqlConnection(adminConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new NpgsqlCommand(script, connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     public TenantId SetTenantForCurrentTest()
     {
@@ -158,33 +179,17 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             await migrationDb.SaveChangesAsync();
         }
 
+        await ProvisionAppRoleAsync(
+            adminConnectionString,
+            TestContext.Current.CancellationToken);
+
         await using (var adminConnection = new NpgsqlConnection(adminConnectionString))
         {
             await adminConnection.OpenAsync();
 
-            await using var command = adminConnection.CreateCommand();
-
-            command.CommandText = """
-                CREATE ROLE commercecore_app
-                    LOGIN
-                    PASSWORD 'TestAppPassword123!'
-                    NOSUPERUSER
-                    NOCREATEDB
-                    NOCREATEROLE
-                    NOINHERIT
-                    NOBYPASSRLS;
-
-                GRANT USAGE ON SCHEMA catalog, outbox, platform TO commercecore_app;
-                GRANT SELECT, INSERT, UPDATE, DELETE
-                    ON ALL TABLES IN SCHEMA catalog, outbox
-                    TO commercecore_app;
-                GRANT SELECT
-                    ON ALL TABLES IN SCHEMA platform
-                    TO commercecore_app;
-                GRANT USAGE, SELECT
-                    ON ALL SEQUENCES IN SCHEMA catalog, outbox, platform
-                    TO commercecore_app;
-                """;
+            await using var command = new NpgsqlCommand(
+                $"ALTER ROLE commercecore_app PASSWORD '{AppRolePassword}'",
+                adminConnection);
 
             await command.ExecuteNonQueryAsync();
         }
@@ -193,7 +198,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             new NpgsqlConnectionStringBuilder(adminConnectionString)
             {
                 Username = "commercecore_app",
-                Password = "TestAppPassword123!"
+                Password = AppRolePassword
             }.ConnectionString;
 
         var services = new ServiceCollection();

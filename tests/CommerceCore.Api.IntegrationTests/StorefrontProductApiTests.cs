@@ -137,7 +137,7 @@ public sealed class StorefrontProductApiTests(StorefrontApiFixture fixture)
             cancellationToken);
 
         Assert.True(await reader.ReadAsync(cancellationToken));
-        Assert.Equal("commercecore_api_test", reader.GetString(0));
+        Assert.Equal("commercecore_app", reader.GetString(0));
         Assert.False(reader.GetBoolean(1));
         Assert.False(reader.GetBoolean(2));
         Assert.True(reader.GetBoolean(3));
